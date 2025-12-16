@@ -7,6 +7,9 @@ class AnimalApp {
         this.animals = [];
         this.itemsPerPage = 9;
         this.currentPage = 1;
+        this.selectedTags = []; // Tags sélectionnés pour le filtrage
+        this.availableTags = []; // Tags disponibles
+        this.animalTagsCount = {}; // Compteur d'animaux par tag
 
         this.init();
     }
@@ -16,6 +19,7 @@ class AnimalApp {
         await this.checkServerStatus();
         await this.loadAnimals();
         await this.updateStats();
+        await this.loadFilterTags();
         this.hideLoading();
     }
 
@@ -97,6 +101,11 @@ class AnimalApp {
                 this.currentPage++;
                 this.displayAnimals();
             }
+        });
+
+        // Tags Filter
+        document.getElementById('clear-tags-filter').addEventListener('click', () => {
+            this.clearTagFilter();
         });
     }
 
@@ -195,6 +204,8 @@ class AnimalApp {
                 this.animals = data.data || [];
                 this.updateTabCounts();
                 this.displayAnimals();
+                // Recharger les tags avec les nouveaux compteurs
+                await this.loadFilterTags();
             } else {
                 throw new Error(data.error);
             }
@@ -233,6 +244,19 @@ class AnimalApp {
                 (animal.tag && animal.tag.toLowerCase().includes(this.currentFilter)) ||
                 (animal.description && animal.description.toLowerCase().includes(this.currentFilter))
             );
+        }
+
+        // Filter by tags (Nouveau filtre)
+        if (this.selectedTags.length > 0) {
+            filtered = filtered.filter(animal => {
+                if (!animal.tag) return false;
+                
+                const animalTags = animal.tag.split(',').map(t => t.trim()).filter(t => t);
+                // Vérifier si l'animal a au moins un des tags sélectionnés
+                return this.selectedTags.some(selectedTag => 
+                    animalTags.some(animalTag => animalTag.toLowerCase() === selectedTag.toLowerCase())
+                );
+            });
         }
 
         return filtered;
@@ -356,6 +380,168 @@ class AnimalApp {
             </div>
         `;
     }
+
+    // ==================== TAGS FILTERING ====================
+
+    async loadFilterTags() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tags`);
+            if (!response.ok) throw new Error('Erreur de connexion');
+
+            const data = await response.json();
+            if (data.success) {
+                this.availableTags = data.data || [];
+                this.displayFilterTags();
+            }
+        } catch (error) {
+            console.warn('Impossible de charger les tags:', error);
+            this.availableTags = [];
+            this.displayFilterTags();
+        }
+    }
+
+    displayFilterTags() {
+        const container = document.getElementById('tags-filter-list');
+        const filterContainer = document.getElementById('tags-filter-container');
+        
+        if (!container || !filterContainer) return;
+
+        // Calculer le nombre d'animaux par tag
+        this.calculateTagCounts();
+
+        if (this.availableTags.length === 0) {
+            container.innerHTML = `
+                <div class="tags-filter-empty">
+                    Aucun tag disponible. Ajoutez des tags dans vos animaux.
+                </div>
+            `;
+            filterContainer.classList.remove('active');
+            return;
+        }
+
+        // Afficher le conteneur de filtrage
+        filterContainer.classList.add('active');
+
+        // Trier les tags par nombre d'animaux (descendant)
+        const sortedTags = [...this.availableTags].sort((a, b) => {
+            const countA = this.animalTagsCount[a] || 0;
+            const countB = this.animalTagsCount[b] || 0;
+            return countB - countA;
+        });
+
+        container.innerHTML = sortedTags.map(tag => {
+            const count = this.animalTagsCount[tag] || 0;
+            const isActive = this.selectedTags.includes(tag);
+            return `
+                <div class="filter-tag ${isActive ? 'active' : ''}" data-tag="${tag}">
+                    ${tag}
+                    <span class="tag-count">${count}</span>
+                </div>
+            `;
+        }).join('');
+
+        // Ajouter les événements de clic
+        document.querySelectorAll('.filter-tag').forEach(item => {
+            item.addEventListener('click', () => {
+                this.toggleTagFilter(item.dataset.tag);
+            });
+        });
+    }
+
+    calculateTagCounts() {
+        // Réinitialiser les compteurs
+        this.animalTagsCount = {};
+
+        this.animals.forEach(animal => {
+            if (animal.tag) {
+                const tags = animal.tag.split(',').map(t => t.trim()).filter(t => t);
+                tags.forEach(tag => {
+                    this.animalTagsCount[tag] = (this.animalTagsCount[tag] || 0) + 1;
+                });
+            }
+        });
+    }
+
+    toggleTagFilter(tag) {
+        const index = this.selectedTags.indexOf(tag);
+        
+        if (index === -1) {
+            // Ajouter le tag
+            this.selectedTags.push(tag);
+        } else {
+            // Retirer le tag
+            this.selectedTags.splice(index, 1);
+        }
+        
+        // Mettre à jour l'affichage
+        this.displayFilterTags();
+        this.displayFilterIndicator();
+        this.currentPage = 1;
+        this.displayAnimals();
+    }
+
+    displayFilterIndicator() {
+        // Trouver ou créer l'indicateur
+        let indicator = document.querySelector('.filter-indicator');
+        const controls = document.querySelector('.controls');
+        
+        if (this.selectedTags.length > 0) {
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'filter-indicator';
+                indicator.innerHTML = `
+                    <i class="fas fa-filter"></i>
+                    <span>Filtre actif :</span>
+                    <div class="filter-tags-selected" id="filter-tags-selected"></div>
+                    <button class="btn-remove-filter" id="remove-all-filters">
+                        <i class="fas fa-times"></i>
+                        Supprimer le filtre
+                    </button>
+                `;
+                
+                if (controls && controls.parentNode) {
+                    controls.parentNode.insertBefore(indicator, controls.nextSibling);
+                }
+                
+                // Ajouter l'événement pour supprimer tous les filtres
+                document.getElementById('remove-all-filters').addEventListener('click', () => {
+                    this.clearTagFilter();
+                });
+            }
+            
+            // Mettre à jour les tags sélectionnés affichés
+            const tagsContainer = indicator.querySelector('.filter-tags-selected');
+            tagsContainer.innerHTML = this.selectedTags.map(tag => `
+                <span class="selected-filter-tag">
+                    ${tag}
+                    <button class="btn-remove-tag" data-tag="${tag}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </span>
+            `).join('');
+            
+            // Ajouter les événements pour supprimer des tags individuels
+            tagsContainer.querySelectorAll('.btn-remove-tag').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleTagFilter(btn.dataset.tag);
+                });
+            });
+        } else if (indicator) {
+            // Supprimer l'indicateur si aucun tag n'est sélectionné
+            indicator.remove();
+        }
+    }
+
+    clearTagFilter() {
+        this.selectedTags = [];
+        this.displayFilterTags();
+        this.displayFilterIndicator();
+        this.currentPage = 1;
+        this.displayAnimals();
+    }
+
+    // ==================== MODAL ====================
 
     openModal(animal = null) {
         const modal = document.getElementById('animal-modal');

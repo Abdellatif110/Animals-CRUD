@@ -54,6 +54,7 @@ app.get('/api', (req, res) => {
             health: 'GET /api/health',
             stats: 'GET /api/stats',
             all_animals: 'GET /api/animals/all',
+            tags: 'GET /api/tags',
 
             // Cats endpoints
             cats_all: 'GET /api/cats',
@@ -108,6 +109,55 @@ app.get('/api/health', (req, res) => {
                 status: 'OK',
                 database: 'Connected',
                 tables: tableNames,
+                timestamp: new Date().toISOString()
+            });
+        });
+    });
+});
+
+// Route pour récupérer tous les tags uniques
+app.get('/api/tags', (req, res) => {
+    pool.getConnection((err, connection) => {
+        if (err) {
+            return res.status(500).json({
+                success: false,
+                error: 'Database connection error'
+            });
+        }
+
+        connection.query(`
+            SELECT DISTINCT tag FROM (
+                SELECT tag FROM cats WHERE tag IS NOT NULL AND tag != ''
+                UNION ALL
+                SELECT tag FROM dogs WHERE tag IS NOT NULL AND tag != ''
+                UNION ALL
+                SELECT tag FROM mouses WHERE tag IS NOT NULL AND tag != ''
+            ) as all_tags
+            WHERE tag IS NOT NULL AND tag != ''
+            ORDER BY tag
+        `, (queryErr, results) => {
+            connection.release();
+
+            if (queryErr) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to get tags'
+                });
+            }
+
+            // Extraire et fusionner tous les tags uniques
+            const allTags = new Set();
+            
+            results.forEach(row => {
+                if (row.tag) {
+                    const tags = row.tag.split(',').map(t => t.trim()).filter(t => t);
+                    tags.forEach(tag => allTags.add(tag));
+                }
+            });
+
+            res.json({
+                success: true,
+                data: Array.from(allTags),
                 timestamp: new Date().toISOString()
             });
         });
@@ -1130,6 +1180,7 @@ app.use((req, res) => {
             'GET /api',
             'GET /api/health',
             'GET /api/stats',
+            'GET /api/tags',
             'GET /api/animals/all',
             'GET /api/setup',
             'GET /api/demo',
@@ -1174,6 +1225,7 @@ app.listen(PORT, () => {
     console.log('   📍 API Docs: http://localhost:' + PORT + '/api');
     console.log('   ❤️  Health: http://localhost:' + PORT + '/api/health');
     console.log('   📊 Stats: http://localhost:' + PORT + '/api/stats');
+    console.log('   🏷️  Tags: http://localhost:' + PORT + '/api/tags');
     console.log('   🐾 All Animals: http://localhost:' + PORT + '/api/animals/all');
     console.log('   ⚙️  Setup: http://localhost:' + PORT + '/api/setup');
     console.log('   🎮 Demo Data: http://localhost:' + PORT + '/api/demo');
