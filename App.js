@@ -3,6 +3,8 @@ const mysql = require('mysql2');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const session = require('express-session');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +14,14 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'Public')));
+
+// Session middleware
+app.use(session({
+    secret: 'animals-crud-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false }
+}));
 
 // إعداد اتصال قاعدة البيانات
 const pool = mysql.createPool({
@@ -147,7 +157,7 @@ app.get('/api/tags', (req, res) => {
 
             // Extraire et fusionner tous les tags uniques
             const allTags = new Set();
-            
+
             results.forEach(row => {
                 if (row.tag) {
                     const tags = row.tag.split(',').map(t => t.trim()).filter(t => t);
@@ -302,6 +312,10 @@ app.put('/api/cats/:id', (req, res) => {
     const id = req.params.id;
     const { name, tag, description, img } = req.body;
 
+    if (!req.session.userId) {
+        return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
     pool.getConnection((err, connection) => {
         if (err) {
             return res.status(500).json({
@@ -382,6 +396,10 @@ app.put('/api/cats/:id', (req, res) => {
 // 5. DELETE cat
 app.delete('/api/cats/:id', (req, res) => {
     const id = req.params.id;
+
+    if (!req.session.userId) {
+        return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
 
     pool.getConnection((err, connection) => {
         if (err) {
@@ -546,6 +564,10 @@ app.put('/api/dogs/:id', (req, res) => {
     const id = req.params.id;
     const { name, tag, description, img } = req.body;
 
+    if (!req.session.userId) {
+        return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
     pool.getConnection((err, connection) => {
         if (err) {
             return res.status(500).json({
@@ -604,6 +626,10 @@ app.put('/api/dogs/:id', (req, res) => {
 // 5. DELETE dog
 app.delete('/api/dogs/:id', (req, res) => {
     const id = req.params.id;
+
+    if (!req.session.userId) {
+        return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
 
     pool.getConnection((err, connection) => {
         if (err) {
@@ -765,6 +791,10 @@ app.put('/api/mouses/:id', (req, res) => {
     const id = req.params.id;
     const { name, tag, description, img } = req.body;
 
+    if (!req.session.userId) {
+        return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
     pool.getConnection((err, connection) => {
         if (err) {
             return res.status(500).json({
@@ -823,6 +853,10 @@ app.put('/api/mouses/:id', (req, res) => {
 // 5. DELETE mouse
 app.delete('/api/mouses/:id', (req, res) => {
     const id = req.params.id;
+
+    if (!req.session.userId) {
+        return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
 
     pool.getConnection((err, connection) => {
         if (err) {
@@ -1010,6 +1044,15 @@ app.get('/api/setup', (req, res) => {
             )
         `;
 
+        const createUsersTable = `
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
         connection.query(createCatsTable, (err1) => {
             if (err1) {
                 connection.release();
@@ -1029,19 +1072,29 @@ app.get('/api/setup', (req, res) => {
                 }
 
                 connection.query(createMousesTable, (err3) => {
-                    connection.release();
-
                     if (err3) {
+                        connection.release();
                         return res.status(500).json({
                             success: false,
                             error: 'Failed to create mouses table'
                         });
                     }
 
-                    res.json({
-                        success: true,
-                        message: 'Tables created successfully',
-                        tables: ['cats', 'dogs', 'mouses']
+                    connection.query(createUsersTable, (err4) => {
+                        connection.release();
+
+                        if (err4) {
+                            return res.status(500).json({
+                                success: false,
+                                error: 'Failed to create users table'
+                            });
+                        }
+
+                        res.json({
+                            success: true,
+                            message: 'Tables created successfully',
+                            tables: ['cats', 'dogs', 'mouses', 'users']
+                        });
                     });
                 });
             });
@@ -1168,6 +1221,40 @@ app.get('/api/demo', (req, res) => {
     });
 });
 
+// ==================== Auth Routes ====================
+
+// Simple authentication - accepts any email
+app.post('/api/auth', (req, res) => {
+    const { email } = req.body;
+    console.log('🔐 Auth attempt:', email);
+
+    if (!email) {
+        return res.status(400).json({ success: false, error: 'Email required' });
+    }
+
+    // Store email in session (no database needed)
+    req.session.userEmail = email;
+    req.session.userId = Date.now(); // Simple unique ID
+
+    console.log('✅ User authenticated:', email);
+    res.json({ success: true, message: 'Authenticated', email });
+});
+
+app.post('/api/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) return res.status(500).json({ success: false, error: 'Logout failed' });
+        res.json({ success: true, message: 'Logged out' });
+    });
+});
+
+app.get('/api/me', (req, res) => {
+    if (req.session.userId) {
+        res.json({ loggedIn: true, email: req.session.userEmail });
+    } else {
+        res.json({ loggedIn: false });
+    }
+});
+
 // ==================== معالجة الأخطاء ====================
 
 // 404 handler
@@ -1181,6 +1268,10 @@ app.use((req, res) => {
             'GET /api/health',
             'GET /api/stats',
             'GET /api/tags',
+            'GET /api/me',
+            'POST /api/signup',
+            'POST /api/login',
+            'POST /api/logout',
             'GET /api/animals/all',
             'GET /api/setup',
             'GET /api/demo',

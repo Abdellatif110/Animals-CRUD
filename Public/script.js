@@ -7,19 +7,22 @@ class AnimalApp {
         this.animals = [];
         this.itemsPerPage = 9;
         this.currentPage = 1;
-        this.selectedTags = []; // Tags sélectionnés pour le filtrage
+        this.selectedTagsFromSelect = []; // Tags sélectionnés dans le select
         this.availableTags = []; // Tags disponibles
         this.animalTagsCount = {}; // Compteur d'animaux par tag
+        this.isLoggedIn = false;
 
         this.init();
     }
 
     async init() {
         this.initEvents();
+        this.setActiveNavLink();
+        await this.checkLoginStatus();
         await this.checkServerStatus();
         await this.loadAnimals();
         await this.updateStats();
-        await this.loadFilterTags();
+        await this.loadTagsForSelect(); // Charger les tags dans le select
         this.hideLoading();
     }
 
@@ -103,10 +106,26 @@ class AnimalApp {
             }
         });
 
-        // Tags Filter
-        document.getElementById('clear-tags-filter').addEventListener('click', () => {
-            this.clearTagFilter();
-        });
+        // Tags Selector Events
+        const tagsSelect = document.getElementById('tags-select');
+        if (tagsSelect) {
+            tagsSelect.addEventListener('change', (e) => {
+                this.handleTagSelection(e);
+            });
+        }
+
+        const clearSelectorBtn = document.getElementById('clear-tags-selector');
+        if (clearSelectorBtn) {
+            clearSelectorBtn.addEventListener('click', () => {
+                this.clearTagSelector();
+            });
+        }
+
+        // Auth events
+        document.getElementById('auth-btn').addEventListener('click', () => this.openAuthModal());
+        document.getElementById('logout-btn').addEventListener('click', () => this.logout());
+        document.getElementById('close-auth-modal').addEventListener('click', () => this.closeAuthModal());
+        document.getElementById('auth-form').addEventListener('submit', (e) => this.handleAuth(e));
     }
 
     async checkServerStatus() {
@@ -203,9 +222,9 @@ class AnimalApp {
             if (data.success) {
                 this.animals = data.data || [];
                 this.updateTabCounts();
+                this.calculateTagCounts(); // Calculer les compteurs de tags
                 this.displayAnimals();
-                // Recharger les tags avec les nouveaux compteurs
-                await this.loadFilterTags();
+                await this.loadTagsForSelect(); // Recharger les tags dans le select
             } else {
                 throw new Error(data.error);
             }
@@ -229,6 +248,20 @@ class AnimalApp {
         document.getElementById('tab-mouses-count').textContent = mousesCount;
     }
 
+    calculateTagCounts() {
+        // Réinitialiser les compteurs
+        this.animalTagsCount = {};
+
+        this.animals.forEach(animal => {
+            if (animal.tag) {
+                const tags = animal.tag.split(',').map(t => t.trim()).filter(t => t);
+                tags.forEach(tag => {
+                    this.animalTagsCount[tag] = (this.animalTagsCount[tag] || 0) + 1;
+                });
+            }
+        });
+    }
+
     getFilteredAnimals() {
         let filtered = this.animals;
 
@@ -246,14 +279,14 @@ class AnimalApp {
             );
         }
 
-        // Filter by tags (Nouveau filtre)
-        if (this.selectedTags.length > 0) {
+        // Filter by selected tags (from select)
+        if (this.selectedTagsFromSelect.length > 0) {
             filtered = filtered.filter(animal => {
                 if (!animal.tag) return false;
-                
+
                 const animalTags = animal.tag.split(',').map(t => t.trim()).filter(t => t);
                 // Vérifier si l'animal a au moins un des tags sélectionnés
-                return this.selectedTags.some(selectedTag => 
+                return this.selectedTagsFromSelect.some(selectedTag =>
                     animalTags.some(animalTag => animalTag.toLowerCase() === selectedTag.toLowerCase())
                 );
             });
@@ -367,6 +400,7 @@ class AnimalApp {
                         ${date || `ID: ${animal.id}`}
                     </div>
                     <div class="card-actions">
+                        ${this.isLoggedIn ? `
                         <button class="action-btn btn-edit" title="Modifier">
                             <i class="fas fa-edit"></i>
                             Modifier
@@ -375,15 +409,16 @@ class AnimalApp {
                             <i class="fas fa-trash"></i>
                             Supprimer
                         </button>
+                        ` : ''}
                     </div>
                 </div>
             </div>
         `;
     }
 
-    // ==================== TAGS FILTERING ====================
+    // ==================== TAGS SELECT SYSTEM ====================
 
-    async loadFilterTags() {
+    async loadTagsForSelect() {
         try {
             const response = await fetch(`${this.apiBaseUrl}/tags`);
             if (!response.ok) throw new Error('Erreur de connexion');
@@ -391,36 +426,38 @@ class AnimalApp {
             const data = await response.json();
             if (data.success) {
                 this.availableTags = data.data || [];
-                this.displayFilterTags();
+                this.populateTagSelect();
             }
         } catch (error) {
             console.warn('Impossible de charger les tags:', error);
-            this.availableTags = [];
-            this.displayFilterTags();
+            this.showTagsError();
         }
     }
 
-    displayFilterTags() {
-        const container = document.getElementById('tags-filter-list');
-        const filterContainer = document.getElementById('tags-filter-container');
-        
-        if (!container || !filterContainer) return;
+    populateTagSelect() {
+        const select = document.getElementById('tags-select');
+        const display = document.getElementById('selected-tags-display');
 
-        // Calculer le nombre d'animaux par tag
-        this.calculateTagCounts();
+        if (!select) return;
 
-        if (this.availableTags.length === 0) {
-            container.innerHTML = `
-                <div class="tags-filter-empty">
-                    Aucun tag disponible. Ajoutez des tags dans vos animaux.
-                </div>
-            `;
-            filterContainer.classList.remove('active');
+        // Vider le select
+        select.innerHTML = '';
+
+        if (!this.availableTags || this.availableTags.length === 0) {
+            select.innerHTML = '<option value="" disabled>Aucun tag disponible</option>';
+            if (display) {
+                display.innerHTML = '<div class="no-tags-message">Ajoutez des tags à vos animaux</div>';
+            }
             return;
         }
 
-        // Afficher le conteneur de filtrage
-        filterContainer.classList.add('active');
+        // Option par défaut
+        const defaultOption = document.createElement('option');
+        defaultOption.value = "";
+        defaultOption.textContent = "Sélectionnez des tags...";
+        defaultOption.disabled = true;
+        defaultOption.selected = true;
+        select.appendChild(defaultOption);
 
         // Trier les tags par nombre d'animaux (descendant)
         const sortedTags = [...this.availableTags].sort((a, b) => {
@@ -429,116 +466,112 @@ class AnimalApp {
             return countB - countA;
         });
 
-        container.innerHTML = sortedTags.map(tag => {
-            const count = this.animalTagsCount[tag] || 0;
-            const isActive = this.selectedTags.includes(tag);
-            return `
-                <div class="filter-tag ${isActive ? 'active' : ''}" data-tag="${tag}">
-                    ${tag}
-                    <span class="tag-count">${count}</span>
-                </div>
+        // Ajouter chaque tag
+        sortedTags.forEach(tag => {
+            const option = document.createElement('option');
+            option.value = tag;
+            option.textContent = `${tag} (${this.animalTagsCount[tag] || 0})`;
+            option.dataset.count = this.animalTagsCount[tag] || 0;
+            select.appendChild(option);
+        });
+
+        // Mettre à jour l'affichage des tags sélectionnés
+        this.updateSelectedTagsDisplay();
+    }
+
+    handleTagSelection(event) {
+        const select = event.target;
+        const selectedOptions = Array.from(select.selectedOptions)
+            .filter(opt => opt.value) // Exclure l'option par défaut
+            .map(opt => opt.value);
+
+        this.selectedTagsFromSelect = selectedOptions;
+        this.updateSelectedTagsDisplay();
+        this.currentPage = 1;
+        this.displayAnimals();
+    }
+
+    updateSelectedTagsDisplay() {
+        const display = document.getElementById('selected-tags-display');
+        const countSpan = document.getElementById('selected-count');
+
+        if (!display || !countSpan) return;
+
+        // Mettre à jour le compteur
+        countSpan.textContent = `${this.selectedTagsFromSelect.length} tag(s) sélectionné(s)`;
+
+        // Afficher les tags sélectionnés
+        display.innerHTML = '';
+
+        if (this.selectedTagsFromSelect.length === 0) {
+            display.innerHTML = '<div class="no-tags-message">Aucun tag sélectionné</div>';
+            return;
+        }
+
+        this.selectedTagsFromSelect.forEach(tag => {
+            const tagElement = document.createElement('div');
+            tagElement.className = 'selected-tag-item';
+            tagElement.innerHTML = `
+                ${tag}
+                <button class="remove-tag-btn" data-tag="${tag}">
+                    <i class="fas fa-times"></i>
+                </button>
             `;
-        }).join('');
+            display.appendChild(tagElement);
 
-        // Ajouter les événements de clic
-        document.querySelectorAll('.filter-tag').forEach(item => {
-            item.addEventListener('click', () => {
-                this.toggleTagFilter(item.dataset.tag);
+            // Ajouter l'événement pour supprimer le tag
+            tagElement.querySelector('.remove-tag-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.removeSelectedTag(tag);
             });
         });
     }
 
-    calculateTagCounts() {
-        // Réinitialiser les compteurs
-        this.animalTagsCount = {};
+    removeSelectedTag(tag) {
+        const index = this.selectedTagsFromSelect.indexOf(tag);
+        if (index > -1) {
+            this.selectedTagsFromSelect.splice(index, 1);
+            this.updateSelectedTagsDisplay();
 
-        this.animals.forEach(animal => {
-            if (animal.tag) {
-                const tags = animal.tag.split(',').map(t => t.trim()).filter(t => t);
-                tags.forEach(tag => {
-                    this.animalTagsCount[tag] = (this.animalTagsCount[tag] || 0) + 1;
-                });
+            // Désélectionner dans le select
+            const select = document.getElementById('tags-select');
+            if (select) {
+                const option = Array.from(select.options).find(opt => opt.value === tag);
+                if (option) option.selected = false;
             }
-        });
-    }
 
-    toggleTagFilter(tag) {
-        const index = this.selectedTags.indexOf(tag);
-        
-        if (index === -1) {
-            // Ajouter le tag
-            this.selectedTags.push(tag);
-        } else {
-            // Retirer le tag
-            this.selectedTags.splice(index, 1);
+            this.currentPage = 1;
+            this.displayAnimals();
         }
-        
-        // Mettre à jour l'affichage
-        this.displayFilterTags();
-        this.displayFilterIndicator();
-        this.currentPage = 1;
-        this.displayAnimals();
     }
 
-    displayFilterIndicator() {
-        // Trouver ou créer l'indicateur
-        let indicator = document.querySelector('.filter-indicator');
-        const controls = document.querySelector('.controls');
-        
-        if (this.selectedTags.length > 0) {
-            if (!indicator) {
-                indicator = document.createElement('div');
-                indicator.className = 'filter-indicator';
-                indicator.innerHTML = `
-                    <i class="fas fa-filter"></i>
-                    <span>Filtre actif :</span>
-                    <div class="filter-tags-selected" id="filter-tags-selected"></div>
-                    <button class="btn-remove-filter" id="remove-all-filters">
-                        <i class="fas fa-times"></i>
-                        Supprimer le filtre
-                    </button>
-                `;
-                
-                if (controls && controls.parentNode) {
-                    controls.parentNode.insertBefore(indicator, controls.nextSibling);
-                }
-                
-                // Ajouter l'événement pour supprimer tous les filtres
-                document.getElementById('remove-all-filters').addEventListener('click', () => {
-                    this.clearTagFilter();
-                });
-            }
-            
-            // Mettre à jour les tags sélectionnés affichés
-            const tagsContainer = indicator.querySelector('.filter-tags-selected');
-            tagsContainer.innerHTML = this.selectedTags.map(tag => `
-                <span class="selected-filter-tag">
-                    ${tag}
-                    <button class="btn-remove-tag" data-tag="${tag}">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </span>
-            `).join('');
-            
-            // Ajouter les événements pour supprimer des tags individuels
-            tagsContainer.querySelectorAll('.btn-remove-tag').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.toggleTagFilter(btn.dataset.tag);
-                });
+    clearTagSelector() {
+        this.selectedTagsFromSelect = [];
+
+        // Désélectionner toutes les options
+        const select = document.getElementById('tags-select');
+        if (select) {
+            Array.from(select.options).forEach(option => {
+                option.selected = false;
             });
-        } else if (indicator) {
-            // Supprimer l'indicateur si aucun tag n'est sélectionné
-            indicator.remove();
-        }
-    }
 
-    clearTagFilter() {
-        this.selectedTags = [];
-        this.displayFilterTags();
-        this.displayFilterIndicator();
+            // Réactiver l'option par défaut
+            const defaultOption = select.options[0];
+            if (defaultOption) {
+                defaultOption.selected = true;
+            }
+        }
+
+        this.updateSelectedTagsDisplay();
         this.currentPage = 1;
         this.displayAnimals();
+    }
+
+    showTagsError() {
+        const select = document.getElementById('tags-select');
+        if (select) {
+            select.innerHTML = '<option value="" disabled>Erreur de chargement des tags</option>';
+        }
     }
 
     // ==================== MODAL ====================
@@ -725,6 +758,113 @@ class AnimalApp {
         URL.revokeObjectURL(url);
 
         this.showNotification('Données exportées avec succès', 'success');
+    }
+
+    // ==================== AUTH METHODS ====================
+
+    async checkLoginStatus() {
+        try {
+            const response = await fetch('/api/me');
+            const data = await response.json();
+            this.isLoggedIn = data.loggedIn;
+            this.userEmail = data.email || '';
+            this.updateAuthUI();
+        } catch (error) {
+            console.error('Error checking login status:', error);
+        }
+    }
+
+    updateAuthUI() {
+        const authBtn = document.getElementById('auth-btn');
+        const userInfo = document.getElementById('user-info');
+        const userEmailDisplay = document.getElementById('user-email-display');
+
+        if (this.isLoggedIn) {
+            authBtn.classList.add('hidden');
+            userInfo.classList.remove('hidden');
+            if (userEmailDisplay && this.userEmail) {
+                userEmailDisplay.textContent = this.userEmail;
+            }
+        } else {
+            authBtn.classList.remove('hidden');
+            userInfo.classList.add('hidden');
+        }
+        // Re-render cards to show/hide buttons
+        this.displayAnimals();
+    }
+
+    setActiveNavLink() {
+        const currentPath = window.location.pathname;
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+        });
+
+        if (currentPath === '/' || currentPath.includes('index.html')) {
+            document.querySelector('a[href="index.html"]').classList.add('active');
+        } else if (currentPath.includes('about.html')) {
+            document.querySelector('a[href="about.html"]').classList.add('active');
+        } else if (currentPath.includes('contact.html')) {
+            document.querySelector('a[href="contact.html"]').classList.add('active');
+        }
+    }
+
+    openAuthModal() {
+        document.getElementById('auth-modal').style.display = 'flex';
+        setTimeout(() => {
+            document.getElementById('auth-email').focus();
+        }, 100);
+    }
+
+    closeAuthModal() {
+        document.getElementById('auth-modal').style.display = 'none';
+        document.getElementById('auth-form').reset();
+    }
+
+    async handleAuth(e) {
+        e.preventDefault();
+        const email = document.getElementById('auth-email').value.trim();
+
+        if (!email) {
+            this.showNotification('Please enter an email', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.isLoggedIn = true;
+                this.userEmail = email;
+                this.updateAuthUI();
+                this.closeAuthModal();
+                this.showNotification(`Welcome, ${email}! 🎉`, 'success');
+            } else {
+                this.showNotification(data.error || 'Authentication failed', 'error');
+            }
+        } catch (error) {
+            console.error('Auth error:', error);
+            this.showNotification('Network error. Please try again.', 'error');
+        }
+    }
+
+    async logout() {
+        try {
+            await fetch('/api/logout', { method: 'POST' });
+            this.isLoggedIn = false;
+            this.userEmail = '';
+            this.updateAuthUI();
+            this.showNotification('Logged out successfully', 'info');
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
     }
 }
 
