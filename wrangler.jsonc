@@ -1,0 +1,24 @@
+{
+	"name": "my-worker",
+	"compatibility_date": "2025-12-18",
+	"main": "src/index.js",
+	"d1_databases": [
+		{
+			"binding": "DB", // binding used in the worker code
+			"database_name": "testdb", // your database name
+			"database_id": "cf6dd7c2-0e4f-4fc9-a895-92d6bf9159fa" // replace with your actual database id
+		},
+		{
+			"binding": "testdb",
+			"database_name": "testdb",
+			"database_id": "cf6dd7c2-0e4f-4fc9-a895-92d6bf9159fa",
+			"remote": true
+		}
+	],
+	"build": {
+		"command": "npm install"
+	},
+	"env": {
+		"JWT_SECRET": "your_secret_here"
+	}
+}
