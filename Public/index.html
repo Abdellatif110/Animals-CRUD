@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animals CRUD - Gestion Complète</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐾</text></svg>">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-paw"></i>
+                <span>Animals CRUD</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="about.html" class="nav-link">About</a></li>
+                <li><a href="contact.html" class="nav-link">Contact</a></li>
+                <li><a href="database.html" class="nav-link">Database</a></li>
+            </ul>
+            <div class="nav-auth">
+                <button id="auth-btn" class="btn-nav">
+                    <i class="fas fa-user"></i> Sign in
+                </button>
+                <div id="user-info" class="user-info hidden">
+                    <span class="user-email" id="user-email-display"></span>
+                    <button id="logout-btn" class="btn-nav-logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-paw"></i>
+                    <h1>Animals CRUD</h1>
+                </div>
+                <p class="subtitle">Gestion complète des animaux - Interface Admin</p>
+            </div>
+            <div class="header-stats">
+                <div class="stat-item">
+                    <i class="fas fa-database"></i>
+                    <span>Base: <strong>testdb</strong></span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-table"></i>
+                    <span>Tables: <strong>3</strong></span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-server"></i>
+                    <span>Backend: <strong>Node.js</strong></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Setup Controls -->
+        <div class="setup-controls" id="setup-controls">
+            <div class="setup-info">
+                <i class="fas fa-info-circle"></i>
+                <span>Base de données prête. Tables: cats, dogs, mouses</span>
+            </div>
+            <div class="setup-buttons">
+                <button class="btn btn-setup" id="btn-setup">
+                    <i class="fas fa-cogs"></i> Initialiser BD
+                </button>
+                <button class="btn btn-demo" id="btn-demo">
+                    <i class="fas fa-download"></i> Données Démo
+                </button>
+                <button class="btn btn-refresh" id="btn-refresh">
+                    <i class="fas fa-sync-alt"></i> Rafraîchir
+                </button>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats">
+            <div class="stat-card stat-cat">
+                <div class="stat-icon">
+                    <i class="fas fa-cat"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value" id="cat-count">0</div>
+                    <div class="stat-label">Chats</div>
+                </div>
+                <div class="stat-trend">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+
+            <div class="stat-card stat-dog">
+                <div class="stat-icon">
+                    <i class="fas fa-dog"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value" id="dog-count">0</div>
+                    <div class="stat-label">Chiens</div>
+                </div>
+                <div class="stat-trend">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+
+            <div class="stat-card stat-mouse">
+                <div class="stat-icon">
+                    <i class="fas fa-mouse"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value" id="mouse-count">0</div>
+                    <div class="stat-label">Souris</div>
+                </div>
+                <div class="stat-trend">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+
+            <div class="stat-card stat-total">
+                <div class="stat-icon">
+                    <i class="fas fa-paw"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value" id="total-count">0</div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-trend">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tags Selector -->
+        <div class="tags-selector-container">
+            <div class="selector-header">
+                <i class="fas fa-filter"></i>
+                <h3>Filtrer par Tags</h3>
+                <button class="btn-clear-selector" id="clear-tags-selector">
+                    <i class="fas fa-times"></i> Tout effacer
+                </button>
+            </div>
+
+            <div class="select-wrapper">
+                <select id="tags-select" multiple class="tags-multiselect">
+                    <option value="" disabled selected>Sélectionnez des tags...</option>
+                    <!-- Les options seront ajoutées dynamiquement -->
+                </select>
+                <div class="selected-tags-display" id="selected-tags-display">
+                    <!-- Tags sélectionnés apparaissent ici -->
+                </div>
+            </div>
+
+            <div class="selector-info">
+                <span id="selected-count">0 tag(s) sélectionné(s)</span>
+                <span class="hint">(Ctrl+clic pour sélection multiple)</span>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="all">
+                <i class="fas fa-th"></i>
+                <span>Tous</span>
+                <span class="tab-count" id="tab-all-count">0</span>
+            </button>
+            <button class="tab-btn" data-tab="cats">
+                <i class="fas fa-cat"></i>
+                <span>Chats</span>
+                <span class="tab-count" id="tab-cats-count">0</span>
+            </button>
+            <button class="tab-btn" data-tab="dogs">
+                <i class="fas fa-dog"></i>
+                <span>Chiens</span>
+                <span class="tab-count" id="tab-dogs-count">0</span>
+            </button>
+            <button class="tab-btn" data-tab="mouses">
+                <i class="fas fa-mouse"></i>
+                <span>Souris</span>
+                <span class="tab-count" id="tab-mouses-count">0</span>
+            </button>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-input" placeholder="Rechercher par nom, tag, description...">
+                    <button class="clear-search" id="clear-search" title="Effacer la recherche">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="search-info" id="search-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Recherche en temps réel</span>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-add" id="add-animal-btn">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Nouvel Animal</span>
+                </button>
+                <button class="btn btn-export" id="export-btn">
+                    <i class="fas fa-file-export"></i>
+                    <span>Exporter</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Cards Container -->
+        <div class="cards-container" id="cards-container">
+            <!-- Les cartes seront générées ici par JavaScript -->
+            <div class="no-data" id="no-data-message">
+                <div class="no-data-icon">
+                    <i class="fas fa-paw"></i>
+                </div>
+                <h3>Aucun animal trouvé</h3>
+                <p>Commencez par ajouter des animaux ou chargez des données de démo.</p>
+                <div class="no-data-actions">
+                    <button class="btn btn-primary" id="btn-first-add">
+                        <i class="fas fa-plus"></i> Ajouter mon premier animal
+                    </button>
+                    <button class="btn btn-secondary" id="btn-first-demo">
+                        <i class="fas fa-download"></i> Charger des données de démo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination">
+            <button class="pagination-btn" id="prev-page" disabled>
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="page-info">
+                Page <span id="current-page">1</span> sur <span id="total-pages">1</span>
+            </div>
+            <button class="pagination-btn" id="next-page" disabled>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4><i class="fas fa-database"></i> Base de Données</h4>
+                    <p><strong>testdb</strong> - Tables: cats, dogs, mouses</p>
+                    <p>Structure: id, name, tag, description, img, created_at</p>
+                </div>
+                <div class="footer-section">
+                    <h4><i class="fas fa-code"></i> Technologies</h4>
+                    <div class="tech-stack">
+                        <span class="tech-badge">Node.js</span>
+                        <span class="tech-badge">Express</span>
+                        <span class="tech-badge">MySQL</span>
+                        <span class="tech-badge">HTML/CSS/JS</span>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4><i class="fas fa-link"></i> API Endpoints</h4>
+                    <div class="api-endpoints">
+                        <code>/api/cats</code>
+                        <code>/api/dogs</code>
+                        <code>/api/mouses</code>
+                        <code>/api/stats</code>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>Animals CRUD Management System © 2025 - Développé avec <i class="fas fa-heart"></i></p>
+                <p class="server-status" id="server-status">
+                    <i class="fas fa-circle status-online"></i>
+                    Serveur connecté
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal pour ajouter/modifier un animal -->
+    <div class="modal" id="animal-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Ajouter un nouvel animal</span>
+                </h3>
+                <button class="close-modal" id="close-modal" aria-label="Fermer">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="animal-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="animal-name">
+                                <i class="fas fa-tag"></i>
+                                Nom *
+                            </label>
+                            <input type="text" id="animal-name" name="name" required
+                                placeholder="Ex: Whiskers, Buddy, Squeaky">
+                            <div class="form-hint">Nom unique de l'animal</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="animal-type">
+                                <i class="fas fa-paw"></i>
+                                Type *
+                            </label>
+                            <select id="animal-type" name="type" required>
+                                <option value="">Sélectionner un type</option>
+                                <option value="cats">🐱 Chat</option>
+                                <option value="dogs">🐶 Chien</option>
+                                <option value="mouses">🐭 Souris</option>
+                            </select>
+                            <div class="form-hint">Catégorie de l'animal</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="animal-tags">
+                            <i class="fas fa-hashtag"></i>
+                            Tags
+                        </label>
+                        <input type="text" id="animal-tags" name="tags"
+                            placeholder="Ex: joueur, calme, affectueux, intelligent">
+                        <div class="form-hint">Mots-clés séparés par des virgules</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="animal-description">
+                            <i class="fas fa-align-left"></i>
+                            Description
+                        </label>
+                        <textarea id="animal-description" name="description"
+                            placeholder="Décrivez l'animal, son caractère, ses habitudes..."></textarea>
+                        <div class="form-hint">Description détaillée de l'animal</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="animal-image">
+                            <i class="fas fa-image"></i>
+                            URL de l'image
+                        </label>
+                        <input type="text" id="animal-image" name="image" placeholder="https://example.com/photo.jpg">
+                        <div class="form-hint">
+                            Laissez vide pour utiliser une image par défaut selon le type
+                        </div>
+                        <div class="image-preview" id="image-preview">
+                            <div class="preview-placeholder">
+                                <i class="fas fa-image"></i>
+                                <span>Aperçu de l'image</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="hidden" id="animal-id" name="id">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="cancel-modal">
+                        <i class="fas fa-times"></i>
+                        Annuler
+                    </button>
+                    <button type="button" class="btn btn-save" id="save-animal">
+                        <i class="fas fa-save"></i>
+                        <span id="save-button-text">Enregistrer</span>
+                        <div class="loading-spinner" id="save-loading">
+                            <div class="spinner"></div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="modal" id="auth-modal">
+        <div class="modal-content auth-modal-content">
+            <button class="close-modal" id="close-auth-modal"><i class="fas fa-times"></i></button>
+            <div class="auth-modal-body">
+                <div class="auth-icon">
+                    <i class="fas fa-paw"></i>
+                </div>
+                <h2 class="auth-title">Welcome to Animals CRUD</h2>
+                <p class="auth-subtitle">Enter your email to continue</p>
+                <form id="auth-form">
+                    <div class="auth-input-group">
+                        <i class="fas fa-envelope"></i>
+                        <input type="text" id="auth-email" placeholder="Enter any email..." autocomplete="email">
+                    </div>
+                    <button type="submit" class="auth-submit-btn">
+                        <span>Continue</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </form>
+                <p class="auth-note">
+                    <i class="fas fa-info-circle"></i>
+                    No password needed - just enter any email to get started
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification-container"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner large">
+                <div class="spinner"></div>
+            </div>
+            <p>Chargement des données...</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

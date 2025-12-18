@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About - Animals CRUD</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="icon" type="image/x-icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐾</text></svg>">
+</head>
+
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-logo">
+        <i class="fas fa-paw"></i>
+        <span>Animals CRUD</span>
+      </div>
+      <ul class="nav-menu">
+        <li><a href="index.html" class="nav-link">Home</a></li>
+        <li><a href="about.html" class="nav-link">About</a></li>
+        <li><a href="contact.html" class="nav-link">Contact</a></li>
+        <li><a href="database.html" class="nav-link">Database</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section id="about" class="section">
+    <div class="container">
+      <h2>About Animals CRUD</h2>
+      <p>Welcome to Animals CRUD, a comprehensive web application for managing animal data. This project demonstrates
+        full-stack development using modern web technologies.</p>
+
+      <h3>Project Overview</h3>
+      <p>This application allows users to perform complete CRUD (Create, Read, Update, Delete) operations on three types
+        of animals: cats, dogs, and mice. The system includes user authentication, ensuring that only logged-in users
+        can modify or delete animal records.</p>
+
+      <h3>Technologies Used</h3>
+      <ul>
+        <li><strong>Backend:</strong> Node.js with Express.js framework</li>
+        <li><strong>Database:</strong> MySQL with connection pooling</li>
+        <li><strong>Authentication:</strong> Express sessions with bcrypt password hashing</li>
+        <li><strong>Frontend:</strong> HTML5, CSS3, and vanilla JavaScript</li>
+        <li><strong>Styling:</strong> Custom CSS with Font Awesome icons</li>
+      </ul>
+
+      <h3>Features</h3>
+      <ul>
+        <li>User registration and login system</li>
+        <li>Role-based access control (authenticated users can edit/delete)</li>
+        <li>Responsive design for mobile and desktop</li>
+        <li>Real-time search and filtering by tags</li>
+        <li>Pagination for large datasets</li>
+        <li>Statistics dashboard</li>
+        <li>Demo data loading</li>
+      </ul>
+
+      <h3>Database Structure</h3>
+      <p>The application uses four main tables:</p>
+      <ul>
+        <li><code>cats</code> - Stores cat information</li>
+        <li><code>dogs</code> - Stores dog information</li>
+        <li><code>mouses</code> - Stores mouse information</li>
+        <li><code>users</code> - Stores user accounts</li>
+      </ul>
+
+      <p>Each animal record includes: ID, name, tags, description, image URL, and creation timestamp.</p>
+
+      <h3>API Endpoints</h3>
+      <p>The application provides a RESTful API with endpoints for all CRUD operations, statistics, and user management.
+      </p>
+    </div>
+  </section>
+
+  <!-- Notification Container -->
+  <div id="notification-container"></div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-content">
+      <div class="loading-spinner large">
+        <div class="spinner"></div>
+      </div>
+      <p>Chargement des données...</p>
+    </div>
+  </div>
+
+  <script src="simple-page.js"></script>
+</body>
+
+</html>
