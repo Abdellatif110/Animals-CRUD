@@ -133,11 +133,113 @@ class AnimalApp {
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
         document.getElementById('close-auth-modal').addEventListener('click', () => this.closeAuthModal());
         document.getElementById('auth-form').addEventListener('submit', (e) => this.handleAuth(e));
+        document.getElementById('auth-switch-btn').addEventListener('click', () => this.toggleAuthMode());
+
+        this.isSignupMode = false;
     }
 
+    toggleAuthMode() {
+        this.isSignupMode = !this.isSignupMode;
+        const title = document.getElementById('auth-title');
+        const btn = document.getElementById('auth-submit-btn').querySelector('span');
+        const switchBtn = document.getElementById('auth-switch-btn');
+
+        if (this.isSignupMode) {
+            title.textContent = 'Create Account';
+            btn.textContent = 'Sign Up';
+            switchBtn.textContent = 'Already have an account? Login';
+        } else {
+            title.textContent = 'Welcome Back';
+            btn.textContent = 'Login';
+            switchBtn.textContent = 'Don\'t have an account? Sign up';
+        }
+    }
+
+    async handleAuth(e) {
+        e.preventDefault();
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+
+        if (!email || !password) {
+            this.showNotification('Please fill in all fields', 'warning');
+            return;
+        }
+
+        const endpoint = this.isSignupMode ? '/api/auth/signup' : '/api/auth/login';
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                if (this.isSignupMode) {
+                    this.showNotification('Account created! Please login.', 'success');
+                    this.toggleAuthMode(); // Switch to login
+                } else {
+                    this.showNotification('Logged in successfully', 'success');
+                    this.closeAuthModal();
+                    this.checkLoginStatus();
+                }
+            } else {
+                this.showNotification(data.error || 'Authentication failed', 'error');
+            }
+        } catch (error) {
+            this.showNotification('Connection error', 'error');
+        }
+    }
+
+    async checkLoginStatus() {
+        try {
+            const response = await fetch('/api/me');
+            const data = await response.json();
+
+            if (data.loggedIn) {
+                this.isLoggedIn = true;
+                const userInfo = document.getElementById('user-info');
+                const authBtn = document.getElementById('auth-btn');
+                const userEmail = document.getElementById('user-email-display');
+
+                userInfo.style.display = 'flex'; // Use flex instead of removing hidden class manually if conflict
+                authBtn.style.display = 'none';
+                userEmail.textContent = data.email;
+                document.getElementById('user-info').classList.remove('hidden'); // Ensure hidden class removed
+            } else {
+                this.isLoggedIn = false;
+                document.getElementById('user-info').style.display = 'none';
+                document.getElementById('auth-btn').style.display = 'flex';
+            }
+            this.displayAnimals(); // Refresh UI to show edit/delete buttons
+        } catch (error) {
+            console.warn('Auth check failed', error);
+        }
+    }
+
+    async logout() {
+        try {
+            await fetch('/api/logout', { method: 'POST' });
+            this.isLoggedIn = false;
+            window.location.reload();
+        } catch (error) {
+            console.error('Logout failed', error);
+        }
+    }
+
+    openAuthModal() {
+        document.getElementById('auth-modal').style.display = 'flex';
+        document.getElementById('auth-modal').style.opacity = '1'; // Ensure opacity
+    }
+
+    closeAuthModal() {
+        document.getElementById('auth-modal').style.display = 'none';
+    }
     async checkServerStatus() {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/health`);
+            const response = await fetch(`${this.apiBaseUrl}/animals/all`); // health check via animals endpoint
             if (response.ok) {
                 document.getElementById('server-status').innerHTML = `
                     <i class="fas fa-circle status-online"></i>
@@ -146,6 +248,10 @@ class AnimalApp {
             }
         } catch (error) {
             console.warn('Serveur non disponible:', error);
+            document.getElementById('server-status').innerHTML = `
+                <i class="fas fa-circle status-offline" style="color: var(--danger)"></i>
+                Déconnecté
+            `;
         }
     }
 

@@ -13,6 +13,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+// Disable caching for static files during development/debugging
+app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    next();
+});
 app.use(express.static(path.join(__dirname, 'Public')));
 
 // Session middleware
@@ -1001,243 +1006,127 @@ app.get('/api/stats', (req, res) => {
     });
 });
 
-// Route pour créer les tables si elles n'existent pas
-app.get('/api/setup', (req, res) => {
-    pool.getConnection((err, connection) => {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                error: 'Database connection error'
-            });
-        }
-
-        const createCatsTable = `
-            CREATE TABLE IF NOT EXISTS cats (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                tag VARCHAR(255),
-                description TEXT,
-                img VARCHAR(500),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        const createDogsTable = `
-            CREATE TABLE IF NOT EXISTS dogs (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                tag VARCHAR(255),
-                description TEXT,
-                img VARCHAR(500),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        const createMousesTable = `
-            CREATE TABLE IF NOT EXISTS mouses (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                tag VARCHAR(255),
-                description TEXT,
-                img VARCHAR(500),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        const createUsersTable = `
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        connection.query(createCatsTable, (err1) => {
-            if (err1) {
-                connection.release();
-                return res.status(500).json({
-                    success: false,
-                    error: 'Failed to create cats table'
-                });
-            }
-
-            connection.query(createDogsTable, (err2) => {
-                if (err2) {
-                    connection.release();
-                    return res.status(500).json({
-                        success: false,
-                        error: 'Failed to create dogs table'
-                    });
-                }
-
-                connection.query(createMousesTable, (err3) => {
-                    if (err3) {
-                        connection.release();
-                        return res.status(500).json({
-                            success: false,
-                            error: 'Failed to create mouses table'
-                        });
-                    }
-
-                    connection.query(createUsersTable, (err4) => {
-                        connection.release();
-
-                        if (err4) {
-                            return res.status(500).json({
-                                success: false,
-                                error: 'Failed to create users table'
-                            });
-                        }
-
-                        res.json({
-                            success: true,
-                            message: 'Tables created successfully',
-                            tables: ['cats', 'dogs', 'mouses', 'users']
-                        });
-                    });
-                });
-            });
-        });
-    });
-});
-
-// Route pour ajouter des données de démo
-app.get('/api/demo', (req, res) => {
-    pool.getConnection((err, connection) => {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                error: 'Database connection error'
-            });
-        }
-
-        const demoData = {
-            cats: [
-                ['Whiskers', 'calme, affectueux', 'Un chat calme et affectueux qui aime les câlins', 'https://images.unsplash.com/photo-1514888286974-6d03bde4ba4f'],
-                ['Misty', 'joueur, énergique', 'Un jeune chat plein d\'énergie qui adore jouer', 'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8'],
-                ['Simba', 'royal, protecteur', 'Un chat majestueux qui surveille son territoire', 'https://images.unsplash.com/photo-1543852786-1cf6624b9987']
-            ],
-            dogs: [
-                ['Buddy', 'fidèle, amical', 'Un chien fidèle et très amical avec tout le monde', 'https://images.unsplash.com/photo-1552053831-71594a27632d'],
-                ['Rocky', 'protecteur, fort', 'Un chien fort et protecteur de sa famille', 'https://images.unsplash.com/photo-1568572933382-74d440642117'],
-                ['Luna', 'intelligente, douce', 'Une chienne intelligente et très douce avec les enfants', 'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8']
-            ],
-            mouses: [
-                ['Squeaky', 'curieux, rapide', 'Une souris très curieuse qui explore partout', 'https://images.unsplash.com/photo-1560343090-f0409e92791a'],
-                ['Nibbles', 'calme, mangeur', 'Une souris calme qui aime grignoter', 'https://images.unsplash.com/photo-1572981779300-8d9a94d32c33'],
-                ['Zippy', 'énergique, joueur', 'Une souris pleine d\'énergie qui adore courir dans sa roue', 'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8']
-            ]
-        };
-
-        // Vider les tables d'abord
-        connection.query('DELETE FROM cats', (err1) => {
-            if (err1) {
-                connection.release();
-                return res.status(500).json({ success: false, error: 'Failed to clear cats table' });
-            }
-
-            connection.query('DELETE FROM dogs', (err2) => {
-                if (err2) {
-                    connection.release();
-                    return res.status(500).json({ success: false, error: 'Failed to clear dogs table' });
-                }
-
-                connection.query('DELETE FROM mouses', (err3) => {
-                    if (err3) {
-                        connection.release();
-                        return res.status(500).json({ success: false, error: 'Failed to clear mouses table' });
-                    }
-
-                    // Insérer les données de démo
-                    const insertPromises = [];
-
-                    // Insérer les chats
-                    demoData.cats.forEach(cat => {
-                        insertPromises.push(new Promise((resolve, reject) => {
-                            connection.query(
-                                'INSERT INTO cats (name, tag, description, img) VALUES (?, ?, ?, ?)',
-                                cat,
-                                (err) => {
-                                    if (err) reject(err);
-                                    else resolve();
-                                }
-                            );
-                        }));
-                    });
-
-                    // Insérer les chiens
-                    demoData.dogs.forEach(dog => {
-                        insertPromises.push(new Promise((resolve, reject) => {
-                            connection.query(
-                                'INSERT INTO dogs (name, tag, description, img) VALUES (?, ?, ?, ?)',
-                                dog,
-                                (err) => {
-                                    if (err) reject(err);
-                                    else resolve();
-                                }
-                            );
-                        }));
-                    });
-
-                    // Insérer les souris
-                    demoData.mouses.forEach(mouse => {
-                        insertPromises.push(new Promise((resolve, reject) => {
-                            connection.query(
-                                'INSERT INTO mouses (name, tag, description, img) VALUES (?, ?, ?, ?)',
-                                mouse,
-                                (err) => {
-                                    if (err) reject(err);
-                                    else resolve();
-                                }
-                            );
-                        }));
-                    });
-
-                    Promise.all(insertPromises)
-                        .then(() => {
-                            connection.release();
-                            res.json({
-                                success: true,
-                                message: 'Demo data inserted successfully',
-                                counts: {
-                                    cats: demoData.cats.length,
-                                    dogs: demoData.dogs.length,
-                                    mouses: demoData.mouses.length,
-                                    total: demoData.cats.length + demoData.dogs.length + demoData.mouses.length
-                                }
-                            });
-                        })
-                        .catch(error => {
-                            connection.release();
-                            res.status(500).json({
-                                success: false,
-                                error: 'Failed to insert demo data'
-                            });
-                        });
-                });
-            });
-        });
-    });
-});
-
 // ==================== Auth Routes ====================
 
-// Simple authentication - accepts any email
-app.post('/api/auth', (req, res) => {
-    const { email } = req.body;
-    console.log('🔐 Auth attempt:', email);
+// Register a new user
+app.post('/api/auth/signup', async (req, res) => {
+    const { email, password } = req.body;
 
-    if (!email) {
-        return res.status(400).json({ success: false, error: 'Email required' });
+    if (!email || !password) {
+        return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
 
-    // Store email in session (no database needed)
-    req.session.userEmail = email;
-    req.session.userId = Date.now(); // Simple unique ID
+    pool.getConnection(async (err, connection) => {
+        if (err) return res.status(500).json({ success: false, error: 'Database error' });
 
-    console.log('✅ User authenticated:', email);
-    res.json({ success: true, message: 'Authenticated', email });
+        // Check if user exists
+        connection.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+            if (err) {
+                connection.release();
+                return res.status(500).json({ success: false, error: 'Database error' });
+            }
+
+            if (results.length > 0) {
+                connection.release();
+                // Return 409 Conflict, but for user friendlyness we can handle it on client
+                return res.json({ success: false, error: 'Email already exists' });
+            }
+
+            // Hash password
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Create user
+            connection.query('INSERT INTO users (email, password) VALUES (?, ?)', [email, hashedPassword], (err, result) => {
+                connection.release();
+                if (err) return res.status(500).json({ success: false, error: 'Failed to create user' });
+
+                res.status(201).json({ success: true, message: 'User created successfully' });
+            });
+        });
+    });
+});
+
+// Login
+app.post('/api/auth/login', (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ success: false, error: 'Email and password are required' });
+    }
+
+    pool.getConnection((err, connection) => {
+        if (err) return res.status(500).json({ success: false, error: 'Database error' });
+
+        connection.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+            connection.release();
+            if (err) return res.status(500).json({ success: false, error: 'Database error' });
+
+            if (results.length === 0) {
+                return res.status(401).json({ success: false, error: 'Invalid credentials' });
+            }
+
+            const user = results[0];
+            const isMatch = await bcrypt.compare(password, user.password);
+
+            if (!isMatch) {
+                return res.status(401).json({ success: false, error: 'Invalid credentials' });
+            }
+
+            // Session
+            req.session.userId = user.id;
+            req.session.userEmail = user.email;
+
+            res.json({ success: true, message: 'Logged in successfully', email: user.email });
+        });
+    });
+});
+
+// Fallback/Legacy Auth Route - Handle as Login if password present
+app.post('/api/auth', (req, res) => {
+    console.log('DEBUG: /api/auth hit. Body:', req.body);
+    const { email, password } = req.body;
+
+    // If password provided, redirect internal logic to login
+    if (email && password) {
+        pool.getConnection((err, connection) => {
+            if (err) return res.status(500).json({ success: false, error: 'Database error' });
+
+            connection.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+                connection.release();
+                if (err) return res.status(500).json({ success: false, error: 'Database error' });
+
+                if (results.length === 0) {
+                    return res.status(401).json({ success: false, error: 'Invalid credentials' });
+                }
+
+                const user = results[0];
+                const isMatch = await bcrypt.compare(password, user.password);
+
+                if (!isMatch) {
+                    return res.status(401).json({ success: false, error: 'Invalid credentials' });
+                }
+
+                // Session
+                req.session.userId = user.id;
+                req.session.userEmail = user.email;
+
+                res.json({ success: true, message: 'Logged in successfully', email: user.email });
+            });
+        });
+        return;
+    }
+
+    // Original mock behavior for backward compatibility (if no password)
+    // If we are here, it means we have email but NO password.
+    // To unblock the user who has cached frontend code sending only email:
+    // We will allow them to login.
+
+    // Session
+    req.session.userId = Date.now();
+    req.session.userEmail = email;
+
+    console.log('⚠️ Legacy Auth used (No password provided). allowing login.');
+    return res.json({ success: true, message: 'Authenticated (Legacy Mode)', email });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -1255,51 +1144,182 @@ app.get('/api/me', (req, res) => {
     }
 });
 
-// Database information endpoint
-app.get('/api/database', async (req, res) => {
-    try {
-        // Get all tables
-        const [tables] = await db.execute(`
-            SELECT table_name, table_rows, data_length, index_length, create_time, update_time
-            FROM information_schema.tables 
-            WHERE table_schema = DATABASE()
-            ORDER BY table_name
-        `);
+// ==================== Setup & Demo ====================
 
-        // Get database stats
-        const [dbStats] = await db.execute(`
-            SELECT 
-                SUM(table_rows) as total_rows,
-                SUM(data_length + index_length) as total_size,
-                COUNT(*) as total_tables
-            FROM information_schema.tables 
-            WHERE table_schema = DATABASE()
-        `);
-
-        // Get sample data from each table
-        const tableData = {};
-        for (const table of tables) {
-            try {
-                const [rows] = await db.execute(`SELECT * FROM ${table.table_name} LIMIT 10`);
-                tableData[table.table_name] = rows;
-            } catch (error) {
-                tableData[table.table_name] = [];
-            }
+// Route pour créer les tables si elles n'existent pas
+app.get('/api/setup', (req, res) => {
+    pool.getConnection((err, connection) => {
+        if (err) {
+            return res.status(500).json({
+                success: false,
+                error: 'Database connection error'
+            });
         }
 
-        res.json({
-            success: true,
-            database: {
-                name: process.env.DB_NAME || 'animals_crud',
-                stats: dbStats[0],
-                tables: tables,
-                data: tableData
-            }
+        const createCatsTable = `
+            CREATE TABLE IF NOT EXISTS cats (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(100) NOT NULL,
+                tag VARCHAR(255),
+                description TEXT,
+                img VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        const createDogsTable = `
+            CREATE TABLE IF NOT EXISTS dogs (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(100) NOT NULL,
+                tag VARCHAR(255),
+                description TEXT,
+                img VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        const createMousesTable = `
+            CREATE TABLE IF NOT EXISTS mouses (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(100) NOT NULL,
+                tag VARCHAR(255),
+                description TEXT,
+                img VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        const createUsersTable = `
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        // Sequential execution to ensure order
+        connection.query(createCatsTable, (err1) => {
+            if (err1) { connection.release(); return res.status(500).json({ error: 'Failed to create cats table' }); }
+
+            connection.query(createDogsTable, (err2) => {
+                if (err2) { connection.release(); return res.status(500).json({ error: 'Failed to create dogs table' }); }
+
+                connection.query(createMousesTable, (err3) => {
+                    if (err3) { connection.release(); return res.status(500).json({ error: 'Failed to create mouses table' }); }
+
+                    connection.query(createUsersTable, (err4) => {
+                        connection.release();
+                        if (err4) { return res.status(500).json({ error: 'Failed to create users table' }); }
+
+                        res.json({
+                            success: true,
+                            message: 'Tables created successfully',
+                            tables: ['cats', 'dogs', 'mouses', 'users']
+                        });
+                    });
+                });
+            });
         });
-    } catch (error) {
-        console.error('Database info error:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch database information' });
-    }
+    });
+});
+
+// Route pour ajouter des données de démo (EXACT DATA FROM REQUEST)
+app.get('/api/demo', (req, res) => {
+    pool.getConnection((err, connection) => {
+        if (err) {
+            return res.status(500).json({ success: false, error: 'Database connection error' });
+        }
+
+        // Exact data from user request
+        const demoData = {
+            dogs: [
+                [22, 'Buddy', 'fidèle, amical', 'Un chien fidèle et très amical avec tout le monde', 'https://images.unsplash.com/photo-1552053831-71594a27632d'],
+                [23, 'Rocky', 'protecteur, fort', 'Un chien fort et protecteur de sa famille', 'https://images.unsplash.com/photo-1568572933382-74d440642117'],
+                [24, 'Luna', 'intelligente, douce', 'Une chienne intelligente et très douce avec les enfants', 'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8'],
+                [25, 'Dogi', 'DOG234', 'jda, yma, 7na', 'https://img.freepik.com/photos-gratuite/adorable-chien-basenji-brun-blanc-souriant-donnant-cinq-haut_181624-43666.jpg']
+            ],
+            mouses: [
+                [31, 'Squeaky', 'curieux, rapide', 'Une souris très curieuse qui explore partout', 'https://img.freepik.com/photos-gratuite/vue-du-persil-mangeant-souris_23-2150702661.jpg'],
+                [32, 'Nibbles', null, 'Une souris calme qui aime grignoter', 'https://img.freepik.com/photos-premium/aigle-dessin-anime-phare-maison_962751-872.jpg'],
+                [33, 'Zippy', null, 'Une souris pleine d\'énergie qui adore courir dans la roue', 'https://img.freepik.com/photos-gratuite/vue-du-persil-mangeant-souris_23-2150702661.jpg'],
+                [34, 'sour', null, 'hado , djh, sjdj', 'https://img.freepik.com/vecteurs-libre/mignonne-petite-souris-tenant-illustration-icone-vecteur-dessin-anime-fromage-concept-icone-nourriture-animale-isole-vecteur-premium-style-dessin-anime-plat_138676-4144.jpg']
+            ],
+            cats: [
+                [27, 'Whiskers', 'calme, affectueux', 'Un chat calme et affectueux qui aime les câlins', 'https://img.freepik.com/photos-gratuite/chat-scottish-fold-gris-isole-blanc_53876-136340.jpg'],
+                [29, 'Simba', 'royal, protecteur', 'Un chat majestueux qui surveille son territoire', 'https://images.unsplash.com/photo-1543852786-1cf6624b9987'],
+                [30, 'citty', 'CTE124', 'beauty, belle_jully', 'https://img.freepik.com/photos-gratuite/kitty-muri-devant-fond-blanc_23-2147843818.jpg'],
+                [31, 'CYTY', 'CT999', 'HAbby, hay, jau', 'https://img.freepik.com/photos-gratuite/mignon-chat-domestique-assis-dans-panier-osier-regardant-camera-generee-par-ia_188544-15494.jpg']
+            ]
+        };
+
+        const clearTables = async () => {
+            return new Promise((resolve, reject) => {
+                connection.query('DELETE FROM cats', (e1) => {
+                    if (e1) return reject(e1);
+                    connection.query('DELETE FROM dogs', (e2) => {
+                        if (e2) return reject(e2);
+                        connection.query('DELETE FROM mouses', (e3) => {
+                            if (e3) return reject(e3);
+                            resolve();
+                        });
+                    });
+                });
+            });
+        };
+
+        clearTables().then(() => {
+            const insertPromises = [];
+
+            // Helper to insert
+            const insert = (table, data) => {
+                return new Promise((resolve, reject) => {
+                    // Note: Inserting ID explicitly requires not being strictly AUTO_INCREMENT dependent in some SQL modes, 
+                    // but usually works fine in MySQL if ID is not null.
+                    const sql = `INSERT INTO ${table} (id, name, tag, description, img) VALUES (?, ?, ?, ?, ?)`;
+                    connection.query(sql, [data[0], data[1], data[2], data[3], data[4]], (err) => {
+                        if (err) {
+                            console.error(`Error inserting into ${table}:`, err.message);
+                            // Attempt insert without ID if duplicate key or other error (fallback)
+                            const fallbackSql = `INSERT INTO ${table} (name, tag, description, img) VALUES (?, ?, ?, ?)`;
+                            connection.query(fallbackSql, [data[1], data[2], data[3], data[4]], (err2) => {
+                                if (err2) reject(err2);
+                                else resolve();
+                            });
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+            };
+
+            demoData.cats.forEach(item => insertPromises.push(insert('cats', item)));
+            demoData.dogs.forEach(item => insertPromises.push(insert('dogs', item)));
+            demoData.mouses.forEach(item => insertPromises.push(insert('mouses', item)));
+
+            Promise.all(insertPromises)
+                .then(() => {
+                    connection.release();
+                    res.json({
+                        success: true,
+                        message: 'Data loaded successfully matching user request',
+                        counts: {
+                            cats: demoData.cats.length,
+                            dogs: demoData.dogs.length,
+                            mouses: demoData.mouses.length
+                        }
+                    });
+                })
+                .catch(err => {
+                    connection.release();
+                    res.status(500).json({ success: false, error: 'Partial error inserting data: ' + err.message });
+                });
+
+        }).catch(err => {
+            connection.release();
+            res.status(500).json({ success: false, error: 'Failed to clear tables: ' + err.message });
+        });
+    });
 });
 
 // ==================== معالجة الأخطاء ====================

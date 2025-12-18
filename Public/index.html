@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Animals CRUD - Gestion Complète</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=3">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/x-icon"
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐾</text></svg>">
@@ -22,7 +22,6 @@
                 <li><a href="index.html" class="nav-link">Home</a></li>
                 <li><a href="about.html" class="nav-link">About</a></li>
                 <li><a href="contact.html" class="nav-link">Contact</a></li>
-                <li><a href="database.html" class="nav-link">Database</a></li>
             </ul>
             <div class="nav-auth">
                 <button id="auth-btn" class="btn-nav">
@@ -389,22 +388,25 @@
                 <div class="auth-icon">
                     <i class="fas fa-paw"></i>
                 </div>
-                <h2 class="auth-title">Welcome to Animals CRUD</h2>
-                <p class="auth-subtitle">Enter your email to continue</p>
+                <h2 class="auth-title" id="auth-title">Welcome Back</h2>
+                <p class="auth-subtitle">Enter your details to continue</p>
+
                 <form id="auth-form">
-                    <div class="auth-input-group">
-                        <i class="fas fa-envelope"></i>
-                        <input type="text" id="auth-email" placeholder="Enter any email..." autocomplete="email">
+                    <div class="form-group">
+                        <input type="email" id="auth-email" placeholder="Email Address" required>
                     </div>
-                    <button type="submit" class="auth-submit-btn">
-                        <span>Continue</span>
+                    <div class="form-group">
+                        <input type="password" id="auth-password" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="auth-submit-btn" id="auth-submit-btn">
+                        <span>Login</span>
                         <i class="fas fa-arrow-right"></i>
                     </button>
                 </form>
-                <p class="auth-note">
-                    <i class="fas fa-info-circle"></i>
-                    No password needed - just enter any email to get started
-                </p>
+
+                <button class="auth-switch-btn" id="auth-switch-btn">
+                    Don't have an account? Sign up
+                </button>
             </div>
         </div>
     </div>
@@ -422,7 +424,7 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=3"></script>
 </body>
 
 </html>
