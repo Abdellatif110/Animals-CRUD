@@ -20,9 +20,16 @@ class AnimalApp {
         this.setActiveNavLink();
         await this.checkLoginStatus();
         await this.checkServerStatus();
-        await this.loadAnimals();
-        await this.updateStats();
-        await this.loadTagsForSelect(); // Charger les tags dans le select
+
+        // Check if we're on the database page
+        if (window.location.pathname.includes('database.html')) {
+            await this.loadDatabaseInfo();
+        } else {
+            await this.loadAnimals();
+            await this.updateStats();
+            await this.loadTagsForSelect(); // Charger les tags dans le select
+        }
+
         this.hideLoading();
     }
 
@@ -210,6 +217,124 @@ class AnimalApp {
         } finally {
             this.hideLoading();
         }
+    }
+
+    async loadDatabaseInfo() {
+        this.showLoading();
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/database`);
+            const data = await response.json();
+
+            if (data.success) {
+                this.displayDatabaseInfo(data.database);
+            } else {
+                this.showNotification(data.error || 'Erreur lors du chargement des informations', 'error');
+            }
+        } catch (error) {
+            this.showNotification('Erreur de connexion au serveur', 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    displayDatabaseInfo(database) {
+        // Update database stats
+        document.getElementById('db-name').textContent = database.name;
+        document.getElementById('db-tables').textContent = database.stats.total_tables;
+        document.getElementById('db-rows').textContent = database.stats.total_rows || 0;
+        document.getElementById('db-size').textContent = this.formatBytes(database.stats.total_size || 0);
+
+        // Display tables
+        const tablesContainer = document.getElementById('tables-container');
+        tablesContainer.innerHTML = '';
+
+        database.tables.forEach(table => {
+            const tableCard = document.createElement('div');
+            tableCard.className = 'table-card';
+            tableCard.innerHTML = `
+                <div class="table-header">
+                    <h3><i class="fas fa-table"></i> ${table.table_name}</h3>
+                    <span class="table-rows">${table.table_rows || 0} rows</span>
+                </div>
+                <div class="table-info">
+                    <div class="info-item">
+                        <span class="label">Size:</span>
+                        <span class="value">${this.formatBytes((table.data_length || 0) + (table.index_length || 0))}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Created:</span>
+                        <span class="value">${table.create_time ? new Date(table.create_time).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Updated:</span>
+                        <span class="value">${table.update_time ? new Date(table.update_time).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary view-table-btn" data-table="${table.table_name}">
+                    <i class="fas fa-eye"></i> View Data
+                </button>
+            `;
+            tablesContainer.appendChild(tableCard);
+        });
+
+        // Add event listeners for view buttons
+        document.querySelectorAll('.view-table-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tableName = e.target.closest('.view-table-btn').dataset.table;
+                this.showTableData(tableName, database.data[tableName]);
+            });
+        });
+    }
+
+    showTableData(tableName, data) {
+        const detailsContainer = document.getElementById('table-details');
+        const detailsTitle = document.getElementById('table-details-title');
+
+        detailsTitle.textContent = `Table: ${tableName}`;
+        detailsContainer.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            detailsContainer.innerHTML = '<p class="no-data">No data available</p>';
+            return;
+        }
+
+        // Create table
+        const table = document.createElement('table');
+        table.className = 'data-table';
+
+        // Create header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        Object.keys(data[0]).forEach(key => {
+            const th = document.createElement('th');
+            th.textContent = key;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Create body
+        const tbody = document.createElement('tbody');
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            Object.values(row).forEach(value => {
+                const td = document.createElement('td');
+                td.textContent = value || '';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+        detailsContainer.appendChild(table);
+    }
+
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
     async loadAnimals() {

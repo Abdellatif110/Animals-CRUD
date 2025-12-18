@@ -1255,6 +1255,53 @@ app.get('/api/me', (req, res) => {
     }
 });
 
+// Database information endpoint
+app.get('/api/database', async (req, res) => {
+    try {
+        // Get all tables
+        const [tables] = await db.execute(`
+            SELECT table_name, table_rows, data_length, index_length, create_time, update_time
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE()
+            ORDER BY table_name
+        `);
+
+        // Get database stats
+        const [dbStats] = await db.execute(`
+            SELECT 
+                SUM(table_rows) as total_rows,
+                SUM(data_length + index_length) as total_size,
+                COUNT(*) as total_tables
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE()
+        `);
+
+        // Get sample data from each table
+        const tableData = {};
+        for (const table of tables) {
+            try {
+                const [rows] = await db.execute(`SELECT * FROM ${table.table_name} LIMIT 10`);
+                tableData[table.table_name] = rows;
+            } catch (error) {
+                tableData[table.table_name] = [];
+            }
+        }
+
+        res.json({
+            success: true,
+            database: {
+                name: process.env.DB_NAME || 'animals_crud',
+                stats: dbStats[0],
+                tables: tables,
+                data: tableData
+            }
+        });
+    } catch (error) {
+        console.error('Database info error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch database information' });
+    }
+});
+
 // ==================== معالجة الأخطاء ====================
 
 // 404 handler
