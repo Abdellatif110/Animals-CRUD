@@ -18,15 +18,30 @@
                 <i class="fas fa-paw"></i>
                 <span>Animals CRUD</span>
             </div>
-            <ul class="nav-menu">
+
+            <button class="menu-toggle" id="menu-toggle" aria-label="Toggle Navigation">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </button>
+
+            <ul class="nav-menu" id="nav-menu">
                 <li><a href="index.html" class="nav-link">Home</a></li>
                 <li><a href="about.html" class="nav-link">About</a></li>
                 <li><a href="contact.html" class="nav-link">Contact</a></li>
+
+                <!-- Mobile Auth Buttons (visible only in mobile menu) -->
+                <li class="mobile-auth">
+                    <div id="mobile-user-info" class="user-info hidden">
+                        <span class="user-email" id="mobile-user-email-display"></span>
+                        <button id="mobile-logout-btn" class="btn-nav-logout">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </div>
+                </li>
             </ul>
-            <div class="nav-auth">
-                <button id="auth-btn" class="btn-nav">
-                    <i class="fas fa-user"></i> Sign in
-                </button>
+
+            <div class="nav-auth desktop-auth">
                 <div id="user-info" class="user-info hidden">
                     <span class="user-email" id="user-email-display"></span>
                     <button id="logout-btn" class="btn-nav-logout">
@@ -423,6 +438,9 @@
             <p>Chargement des données...</p>
         </div>
     </div>
+
+    <!-- Login Overlay (First View) -->
+
 
     <script src="script.js?v=3"></script>
 </body>

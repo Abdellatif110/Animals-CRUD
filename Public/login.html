@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Animals CRUD</title>
+    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--bg-dark), var(--bg-card));
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* Auth Card specific overrides */
+        .auth-container {
+            width: 100%;
+            max-width: 450px;
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .auth-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 2.5rem;
+            color: white;
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .auth-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .auth-subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* Form Styles */
+        .auth-form .form-group {
+            margin-bottom: 20px;
+        }
+
+        .auth-form label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .auth-form input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .auth-form input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+            outline: none;
+        }
+
+        .btn-auth {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-auth:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .auth-footer {
+            margin-top: 25px;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 20px;
+        }
+
+        .switch-auth-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+        }
+
+        .switch-auth-btn:hover {
+            color: var(--secondary);
+            text-decoration: underline;
+        }
+
+        /* Notification */
+        .notification-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 12px;
+            background: white;
+            color: #1e293b;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .notification-toast.show {
+            transform: translateX(0);
+        }
+
+        .notification-toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .notification-toast.error {
+            border-left: 4px solid var(--danger);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <div class="auth-logo">
+                <i class="fas fa-paw"></i>
+            </div>
+            <h1 class="auth-title" id="page-title">Welcome Back</h1>
+            <p class="auth-subtitle" id="page-subtitle">Please sign in to your account</p>
+        </div>
+
+        <form id="auth-form" class="auth-form">
+            <div class="form-group">
+                <label for="email"><i class="fas fa-envelope"></i> Email Address</label>
+                <input type="email" id="email" placeholder="name@company.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Password</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-auth" id="submit-btn">
+                <span>Sign In</span>
+                <i class="fas fa-arrow-right"></i>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p id="footer-text">Don't have an account?</p>
+            <button class="switch-auth-btn" id="toggle-auth">Create an account</button>
+        </div>
+    </div>
+
+    <div id="toast" class="notification-toast">
+        <i class="fas fa-info-circle"></i>
+        <span id="toast-message"></span>
+    </div>
+
+    <script>
+        const form = document.getElementById('auth-form');
+        const toggleBtn = document.getElementById('toggle-auth');
+        const title = document.getElementById('page-title');
+        const subtitle = document.getElementById('page-subtitle');
+        const submitBtn = document.getElementById('submit-btn').querySelector('span');
+        const footerText = document.getElementById('footer-text');
+
+        let isSignup = false;
+
+        toggleBtn.addEventListener('click', () => {
+            isSignup = !isSignup;
+            if (isSignup) {
+                title.textContent = "Create Account";
+                subtitle.textContent = "Join us to manage your animals";
+                submitBtn.textContent = "Sign Up";
+                footerText.textContent = "Already have an account?";
+                toggleBtn.textContent = "Sign In instead";
+            } else {
+                title.textContent = "Welcome Back";
+                subtitle.textContent = "Please sign in to your account";
+                submitBtn.textContent = "Sign In";
+                footerText.textContent = "Don't have an account?";
+                toggleBtn.textContent = "Create an account";
+            }
+        });
+
+        const showToast = (message, type = 'info') => {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-message');
+            msg.textContent = message;
+            toast.className = `notification-toast ${type} show`;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const endpoint = isSignup ? '/api/auth/signup' : '/api/auth/login';
+
+            try {
+                const button = document.querySelector('.btn-auth');
+                const originalText = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                button.disabled = true;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Authentication successful! Redirecting...', 'success');
+                    setTimeout(() => window.location.href = '/', 1000);
+                } else {
+                    showToast(data.error || 'Authentication failed', 'error');
+                }
+            } catch (error) {
+                showToast('Connection error. Please try again.', 'error');
+            } finally {
+                const button = document.querySelector('.btn-auth');
+                button.innerHTML = isSignup ? '<span>Sign Up</span><i class="fas fa-arrow-right"></i>' : '<span>Sign In</span><i class="fas fa-arrow-right"></i>';
+                button.disabled = false;
+            }
+        });
+
+        // Check if already logged in
+        fetch('/api/me').then(res => res.json()).then(data => {
+            if (data.loggedIn) {
+                window.location.href = '/';
+            }
+        });
+    </script>
+</body>
+
+</html>

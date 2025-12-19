@@ -17,21 +17,29 @@ class AnimalApp {
 
     async init() {
         this.initEvents();
+
+        // Check Login and Redirect if needed
+        const isLoggedIn = await this.checkLoginStatus(true);
+        if (!isLoggedIn) {
+            window.location.href = '/login.html';
+            return; // Stop execution
+        }
+
         this.setActiveNavLink();
-        await this.checkLoginStatus();
-        await this.checkServerStatus();
+        this.checkServerStatus();
 
         // Check if we're on the database page
         if (window.location.pathname.includes('database.html')) {
-            await this.loadDatabaseInfo();
+            this.loadDatabaseInfo();
         } else {
-            await this.loadAnimals();
-            await this.updateStats();
-            await this.loadTagsForSelect(); // Charger les tags dans le select
+            this.loadAnimals();
+            this.updateStats();
+            this.loadTagsForSelect();
         }
-
         this.hideLoading();
     }
+
+
 
     initEvents() {
         // Tabs
@@ -129,73 +137,22 @@ class AnimalApp {
         }
 
         // Auth events
-        document.getElementById('auth-btn').addEventListener('click', () => this.openAuthModal());
+        // Auth events
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
-        document.getElementById('close-auth-modal').addEventListener('click', () => this.closeAuthModal());
-        document.getElementById('auth-form').addEventListener('submit', (e) => this.handleAuth(e));
-        document.getElementById('auth-switch-btn').addEventListener('click', () => this.toggleAuthMode());
+
+        const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
+        if (mobileLogoutBtn) {
+            mobileLogoutBtn.addEventListener('click', () => this.logout());
+        }
+
+        this.isSignupMode = false;
 
         this.isSignupMode = false;
     }
 
-    toggleAuthMode() {
-        this.isSignupMode = !this.isSignupMode;
-        const title = document.getElementById('auth-title');
-        const btn = document.getElementById('auth-submit-btn').querySelector('span');
-        const switchBtn = document.getElementById('auth-switch-btn');
-
-        if (this.isSignupMode) {
-            title.textContent = 'Create Account';
-            btn.textContent = 'Sign Up';
-            switchBtn.textContent = 'Already have an account? Login';
-        } else {
-            title.textContent = 'Welcome Back';
-            btn.textContent = 'Login';
-            switchBtn.textContent = 'Don\'t have an account? Sign up';
-        }
-    }
-
-    async handleAuth(e) {
-        e.preventDefault();
-        const email = document.getElementById('auth-email').value;
-        const password = document.getElementById('auth-password').value;
-
-        if (!email || !password) {
-            this.showNotification('Please fill in all fields', 'warning');
-            return;
-        }
-
-        const endpoint = this.isSignupMode ? '/api/auth/signup' : '/api/auth/login';
-
+    async checkLoginStatus(isInit = false) {
         try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                if (this.isSignupMode) {
-                    this.showNotification('Account created! Please login.', 'success');
-                    this.toggleAuthMode(); // Switch to login
-                } else {
-                    this.showNotification('Logged in successfully', 'success');
-                    this.closeAuthModal();
-                    this.checkLoginStatus();
-                }
-            } else {
-                this.showNotification(data.error || 'Authentication failed', 'error');
-            }
-        } catch (error) {
-            this.showNotification('Connection error', 'error');
-        }
-    }
-
-    async checkLoginStatus() {
-        try {
-            const response = await fetch('/api/me');
+            const response = await fetch('/api/me?_=' + Date.now());
             const data = await response.json();
 
             if (data.loggedIn) {
@@ -204,39 +161,53 @@ class AnimalApp {
                 const authBtn = document.getElementById('auth-btn');
                 const userEmail = document.getElementById('user-email-display');
 
-                userInfo.style.display = 'flex'; // Use flex instead of removing hidden class manually if conflict
-                authBtn.style.display = 'none';
-                userEmail.textContent = data.email;
-                document.getElementById('user-info').classList.remove('hidden'); // Ensure hidden class removed
+                // Mobile
+                const mobileUserInfo = document.getElementById('mobile-user-info');
+                const mobileAuthBtn = document.getElementById('mobile-auth-btn');
+                const mobileUserEmail = document.getElementById('mobile-user-email-display');
+
+                if (userInfo) {
+                    userInfo.style.display = 'flex';
+                    userInfo.classList.remove('hidden');
+                }
+                if (authBtn) authBtn.style.display = 'none';
+                if (userEmail) userEmail.textContent = data.email;
+
+                if (mobileUserInfo) {
+                    mobileUserInfo.style.display = 'flex';
+                    mobileUserInfo.classList.remove('hidden');
+                }
+                if (mobileAuthBtn) mobileAuthBtn.style.display = 'none';
+                if (mobileUserEmail) mobileUserEmail.textContent = data.email;
+
             } else {
                 this.isLoggedIn = false;
-                document.getElementById('user-info').style.display = 'none';
-                document.getElementById('auth-btn').style.display = 'flex';
+                if (!isInit) {
+                    // If not init check (e.g. periodically), maybe redirect? 
+                    // For now just update UI
+                    document.getElementById('user-info').style.display = 'none';
+                    document.getElementById('auth-btn').style.display = 'flex';
+                }
             }
-            this.displayAnimals(); // Refresh UI to show edit/delete buttons
+            if (!isInit) this.displayAnimals();
+            return this.isLoggedIn;
         } catch (error) {
             console.warn('Auth check failed', error);
+            return false;
         }
     }
 
     async logout() {
         try {
-            await fetch('/api/logout', { method: 'POST' });
+            await fetch('/api/auth/logout', { method: 'POST' });
             this.isLoggedIn = false;
-            window.location.reload();
+            window.location.href = '/login.html';
         } catch (error) {
             console.error('Logout failed', error);
         }
     }
 
-    openAuthModal() {
-        document.getElementById('auth-modal').style.display = 'flex';
-        document.getElementById('auth-modal').style.opacity = '1'; // Ensure opacity
-    }
 
-    closeAuthModal() {
-        document.getElementById('auth-modal').style.display = 'none';
-    }
     async checkServerStatus() {
         try {
             const response = await fetch(`${this.apiBaseUrl}/animals/all`); // health check via animals endpoint
@@ -1102,4 +1073,22 @@ class AnimalApp {
 // Initialize app when page loads
 document.addEventListener('DOMContentLoaded', () => {
     window.animalApp = new AnimalApp();
+    // Mobile Menu Toggle
+    const menuToggle = document.getElementById('menu-toggle');
+    const navMenu = document.getElementById('nav-menu');
+
+    if (menuToggle && navMenu) {
+        menuToggle.addEventListener('click', () => {
+            menuToggle.classList.toggle('active');
+            navMenu.classList.toggle('active');
+        });
+
+        // Close menu when clicking a link
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                menuToggle.classList.remove('active');
+                navMenu.classList.remove('active');
+            });
+        });
+    }
 });

@@ -168,13 +168,83 @@ export default {
 					return new Response(JSON.stringify({ success: true, data: Array.from(allTags).sort() }), { headers });
 				}
 
-				// Auth Mock
-				if (path === '/api/auth' && method === 'POST') {
-					const { email } = await request.json();
-					return new Response(JSON.stringify({ success: true, message: 'Authenticated', email }), { headers });
+				// Auth Routes
+				// Helper for password hashing (SH-256)
+				const hashPassword = async (password) => {
+					const msgBuffer = new TextEncoder().encode(password);
+					const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+					const hashArray = Array.from(new Uint8Array(hashBuffer));
+					return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+				};
+
+				// SIGNUP
+				if (path === '/api/auth/signup' && method === 'POST') {
+					try {
+						const { email, password } = await request.json();
+						if (!email || !password) return new Response(JSON.stringify({ success: false, error: 'Email and password required' }), { headers });
+
+						// Check if user exists
+						const existing = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+						if (existing) {
+							return new Response(JSON.stringify({ success: false, error: 'Email already exists' }), { headers });
+						}
+
+						const hashedPassword = await hashPassword(password);
+						await env.DB.prepare('INSERT INTO users (email, password) VALUES (?, ?)').bind(email, hashedPassword).run();
+
+						return new Response(JSON.stringify({ success: true, message: 'User created' }), { headers });
+					} catch (e) {
+						return new Response(JSON.stringify({ success: false, error: e.message }), { headers });
+					}
 				}
+
+				// LOGIN
+				if (path === '/api/auth/login' && method === 'POST') {
+					try {
+						const { email, password } = await request.json();
+						const hashedPassword = await hashPassword(password);
+
+						const user = await env.DB.prepare('SELECT * FROM users WHERE email = ? AND password = ?').bind(email, hashedPassword).first();
+
+						if (!user) {
+							return new Response(JSON.stringify({ success: false, error: 'Invalid credentials' }), { headers });
+						}
+
+						// Create a simple session cookie (in a real app Use JWT)
+						// For this demo we will set a cookie with the user ID/email signed or just the email for simplicity as requested "stock info"
+						// WARNING: In production use secure, httpOnly, signed cookies or JWT.
+						const cookie = `auth_token=${btoa(user.email)}; Path=/; SameSite=Lax; Max-Age=86400`;
+
+						return new Response(JSON.stringify({ success: true, message: 'Logged in', email: user.email }), {
+							headers: { ...headers, 'Set-Cookie': cookie }
+						});
+					} catch (e) {
+						return new Response(JSON.stringify({ success: false, error: e.message }), { headers });
+					}
+				}
+
+				// LOGOUT
+				if (path === '/api/auth/logout' && method === 'POST') {
+					const cookie = `auth_token=; Path=/; SameSite=Lax; Max-Age=0`;
+					return new Response(JSON.stringify({ success: true, message: 'Logged out' }), {
+						headers: { ...headers, 'Set-Cookie': cookie }
+					});
+				}
+
+				// ME (Check Session)
 				if (path === '/api/me' && method === 'GET') {
-					return new Response(JSON.stringify({ loggedIn: true, email: 'user@example.com' }), { headers });
+					const cookie = request.headers.get('Cookie');
+					if (cookie && cookie.includes('auth_token=')) {
+						// Extract email from simple token
+						const match = cookie.match(/auth_token=([^;]+)/);
+						if (match) {
+							try {
+								const email = atob(match[1]);
+								return new Response(JSON.stringify({ loggedIn: true, email }), { headers });
+							} catch (e) { }
+						}
+					}
+					return new Response(JSON.stringify({ loggedIn: false }), { headers });
 				}
 
 				return new Response(JSON.stringify({ success: false, error: 'Route not found' }), { status: 404, headers });
