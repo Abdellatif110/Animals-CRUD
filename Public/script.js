@@ -17,29 +17,14 @@ class AnimalApp {
 
     async init() {
         this.initEvents();
-
-        // Check Login and Redirect if needed
-        const isLoggedIn = await this.checkLoginStatus(true);
-        if (!isLoggedIn) {
-            window.location.href = '/login.html';
-            return; // Stop execution
-        }
-
         this.setActiveNavLink();
-        this.checkServerStatus();
-
-        // Check if we're on the database page
-        if (window.location.pathname.includes('database.html')) {
-            this.loadDatabaseInfo();
-        } else {
-            this.loadAnimals();
-            this.updateStats();
-            this.loadTagsForSelect();
-        }
+        await this.checkLoginStatus();
+        await this.checkServerStatus();
+        await this.loadAnimals();
+        await this.updateStats();
+        await this.loadTagsForSelect(); // Charger les tags dans le select
         this.hideLoading();
     }
-
-
 
     initEvents() {
         // Tabs
@@ -68,7 +53,6 @@ class AnimalApp {
 
         // Buttons
         document.getElementById('add-animal-btn').addEventListener('click', () => this.openModal());
-        document.getElementById('btn-first-add').addEventListener('click', () => this.openModal());
 
         document.getElementById('btn-refresh').addEventListener('click', async () => {
             await this.loadAnimals();
@@ -84,6 +68,8 @@ class AnimalApp {
             await this.loadDemoData();
         });
 
+        // Adoption modal events removed as per requirements
+
         document.getElementById('btn-first-demo').addEventListener('click', async () => {
             await this.loadDemoData();
         });
@@ -92,18 +78,7 @@ class AnimalApp {
             this.exportData();
         });
 
-        // Modal
-        document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
-        document.getElementById('cancel-modal').addEventListener('click', () => this.closeModal());
-        document.getElementById('save-animal').addEventListener('click', () => this.saveAnimal());
-
-        document.getElementById('animal-image').addEventListener('input', (e) => {
-            this.updateImagePreview(e.target.value);
-        });
-
-        document.getElementById('animal-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'animal-modal') this.closeModal();
-        });
+        // Animal modal events removed as per requirements
 
         // Pagination
         document.getElementById('prev-page').addEventListener('click', () => {
@@ -137,80 +112,25 @@ class AnimalApp {
         }
 
         // Auth events
-        // Auth events
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
 
-        const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
-        if (mobileLogoutBtn) {
-            mobileLogoutBtn.addEventListener('click', () => this.logout());
-        }
+        // Modal events
+        document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
+        document.getElementById('cancel-btn').addEventListener('click', () => this.closeModal());
+        document.getElementById('save-btn').addEventListener('click', () => this.saveAnimal());
+        document.getElementById('animal-image').addEventListener('input', (e) => this.updateImagePreview(e.target.value));
 
-        this.isSignupMode = false;
-
-        this.isSignupMode = false;
-    }
-
-    async checkLoginStatus(isInit = false) {
-        try {
-            const response = await fetch('/api/me?_=' + Date.now());
-            const data = await response.json();
-
-            if (data.loggedIn) {
-                this.isLoggedIn = true;
-                const userInfo = document.getElementById('user-info');
-                const authBtn = document.getElementById('auth-btn');
-                const userEmail = document.getElementById('user-email-display');
-
-                // Mobile
-                const mobileUserInfo = document.getElementById('mobile-user-info');
-                const mobileAuthBtn = document.getElementById('mobile-auth-btn');
-                const mobileUserEmail = document.getElementById('mobile-user-email-display');
-
-                if (userInfo) {
-                    userInfo.style.display = 'flex';
-                    userInfo.classList.remove('hidden');
-                }
-                if (authBtn) authBtn.style.display = 'none';
-                if (userEmail) userEmail.textContent = data.email;
-
-                if (mobileUserInfo) {
-                    mobileUserInfo.style.display = 'flex';
-                    mobileUserInfo.classList.remove('hidden');
-                }
-                if (mobileAuthBtn) mobileAuthBtn.style.display = 'none';
-                if (mobileUserEmail) mobileUserEmail.textContent = data.email;
-
-            } else {
-                this.isLoggedIn = false;
-                if (!isInit) {
-                    // If not init check (e.g. periodically), maybe redirect? 
-                    // For now just update UI
-                    document.getElementById('user-info').style.display = 'none';
-                    document.getElementById('auth-btn').style.display = 'flex';
-                }
+        // Close modal on outside click
+        document.getElementById('animal-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'animal-modal') {
+                this.closeModal();
             }
-            if (!isInit) this.displayAnimals();
-            return this.isLoggedIn;
-        } catch (error) {
-            console.warn('Auth check failed', error);
-            return false;
-        }
+        });
     }
-
-    async logout() {
-        try {
-            await fetch('/api/auth/logout', { method: 'POST' });
-            this.isLoggedIn = false;
-            window.location.href = '/login.html';
-        } catch (error) {
-            console.error('Logout failed', error);
-        }
-    }
-
 
     async checkServerStatus() {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/animals/all`); // health check via animals endpoint
+            const response = await fetch(`${this.apiBaseUrl}/health`);
             if (response.ok) {
                 document.getElementById('server-status').innerHTML = `
                     <i class="fas fa-circle status-online"></i>
@@ -219,10 +139,6 @@ class AnimalApp {
             }
         } catch (error) {
             console.warn('Serveur non disponible:', error);
-            document.getElementById('server-status').innerHTML = `
-                <i class="fas fa-circle status-offline" style="color: var(--danger)"></i>
-                Déconnecté
-            `;
         }
     }
 
@@ -296,124 +212,6 @@ class AnimalApp {
         }
     }
 
-    async loadDatabaseInfo() {
-        this.showLoading();
-        try {
-            const response = await fetch(`${this.apiBaseUrl}/database`);
-            const data = await response.json();
-
-            if (data.success) {
-                this.displayDatabaseInfo(data.database);
-            } else {
-                this.showNotification(data.error || 'Erreur lors du chargement des informations', 'error');
-            }
-        } catch (error) {
-            this.showNotification('Erreur de connexion au serveur', 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    displayDatabaseInfo(database) {
-        // Update database stats
-        document.getElementById('db-name').textContent = database.name;
-        document.getElementById('db-tables').textContent = database.stats.total_tables;
-        document.getElementById('db-rows').textContent = database.stats.total_rows || 0;
-        document.getElementById('db-size').textContent = this.formatBytes(database.stats.total_size || 0);
-
-        // Display tables
-        const tablesContainer = document.getElementById('tables-container');
-        tablesContainer.innerHTML = '';
-
-        database.tables.forEach(table => {
-            const tableCard = document.createElement('div');
-            tableCard.className = 'table-card';
-            tableCard.innerHTML = `
-                <div class="table-header">
-                    <h3><i class="fas fa-table"></i> ${table.table_name}</h3>
-                    <span class="table-rows">${table.table_rows || 0} rows</span>
-                </div>
-                <div class="table-info">
-                    <div class="info-item">
-                        <span class="label">Size:</span>
-                        <span class="value">${this.formatBytes((table.data_length || 0) + (table.index_length || 0))}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Created:</span>
-                        <span class="value">${table.create_time ? new Date(table.create_time).toLocaleDateString() : 'N/A'}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Updated:</span>
-                        <span class="value">${table.update_time ? new Date(table.update_time).toLocaleDateString() : 'N/A'}</span>
-                    </div>
-                </div>
-                <button class="btn btn-primary view-table-btn" data-table="${table.table_name}">
-                    <i class="fas fa-eye"></i> View Data
-                </button>
-            `;
-            tablesContainer.appendChild(tableCard);
-        });
-
-        // Add event listeners for view buttons
-        document.querySelectorAll('.view-table-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tableName = e.target.closest('.view-table-btn').dataset.table;
-                this.showTableData(tableName, database.data[tableName]);
-            });
-        });
-    }
-
-    showTableData(tableName, data) {
-        const detailsContainer = document.getElementById('table-details');
-        const detailsTitle = document.getElementById('table-details-title');
-
-        detailsTitle.textContent = `Table: ${tableName}`;
-        detailsContainer.innerHTML = '';
-
-        if (!data || data.length === 0) {
-            detailsContainer.innerHTML = '<p class="no-data">No data available</p>';
-            return;
-        }
-
-        // Create table
-        const table = document.createElement('table');
-        table.className = 'data-table';
-
-        // Create header
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        Object.keys(data[0]).forEach(key => {
-            const th = document.createElement('th');
-            th.textContent = key;
-            headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        // Create body
-        const tbody = document.createElement('tbody');
-        data.forEach(row => {
-            const tr = document.createElement('tr');
-            Object.values(row).forEach(value => {
-                const td = document.createElement('td');
-                td.textContent = value || '';
-                tr.appendChild(td);
-            });
-            tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-
-        detailsContainer.appendChild(table);
-    }
-
-    formatBytes(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
     async loadAnimals() {
         this.showLoading();
         try {
@@ -485,10 +283,10 @@ class AnimalApp {
         if (this.selectedTagsFromSelect.length > 0) {
             filtered = filtered.filter(animal => {
                 if (!animal.tag) return false;
-
+                
                 const animalTags = animal.tag.split(',').map(t => t.trim()).filter(t => t);
                 // Vérifier si l'animal a au moins un des tags sélectionnés
-                return this.selectedTagsFromSelect.some(selectedTag =>
+                return this.selectedTagsFromSelect.some(selectedTag => 
                     animalTags.some(animalTag => animalTag.toLowerCase() === selectedTag.toLowerCase())
                 );
             });
@@ -535,22 +333,41 @@ class AnimalApp {
         }
 
         // Add event listeners
+        // Handle edit button clicks
         document.querySelectorAll('.btn-edit').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const id = parseInt(e.target.closest('.card').dataset.id);
-                const type = e.target.closest('.card').dataset.type;
-                const animal = this.animals.find(a => a.id === id && a.type === type);
-                if (animal) this.openModal(animal);
+                const button = e.currentTarget;
+                const id = parseInt(button.dataset.id);
+                const type = button.dataset.type;
+                const animal = this.findAnimalById(id, type);
+                if (animal) {
+                    this.openModal(animal);
+                }
             });
         });
 
+        // Handle delete button clicks
         document.querySelectorAll('.btn-delete').forEach(btn => {
             btn.addEventListener('click', async (e) => {
-                const id = parseInt(e.target.closest('.card').dataset.id);
-                const type = e.target.closest('.card').dataset.type;
+                const button = e.currentTarget;
+                const id = parseInt(button.dataset.id);
+                const type = button.dataset.type;
 
                 if (confirm('Êtes-vous sûr de vouloir supprimer cet animal ?')) {
                     await this.deleteAnimal(type, id);
+                }
+            });
+        });
+
+        // Handle adopt button clicks
+        document.querySelectorAll('.btn-adopt').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.currentTarget;
+                const id = parseInt(button.dataset.id);
+                const type = button.dataset.type;
+                const animal = this.findAnimalById(id, type);
+                if (animal) {
+                    this.openAdoptModal(animal);
                 }
             });
         });
@@ -577,6 +394,22 @@ class AnimalApp {
         const date = animal.created_at ? new Date(animal.created_at).toLocaleDateString('fr-FR') : '';
         const tags = animal.tag ? animal.tag.split(',').map(t => `<span class="card-tag">${t.trim()}</span>`).join('') : '';
 
+        // Determine which action buttons to show
+        let actionButtons = `
+            <button class="action-btn btn-adopt" title="Adopter" data-id="${animal.id}" data-type="${animal.type}" data-name="${animal.name}">
+                <i class="fas fa-heart"></i>
+                Adopter
+            </button>
+            <button class="action-btn btn-edit" title="Modifier" data-id="${animal.id}" data-type="${animal.type}">
+                <i class="fas fa-edit"></i>
+                Modifier
+            </button>
+            <button class="action-btn btn-delete" title="Supprimer" data-id="${animal.id}" data-type="${animal.type}">
+                <i class="fas fa-trash"></i>
+                Supprimer
+            </button>
+        `;
+
         return `
             <div class="card" data-id="${animal.id}" data-type="${animal.type}">
                 <div class="card-header">
@@ -602,16 +435,7 @@ class AnimalApp {
                         ${date || `ID: ${animal.id}`}
                     </div>
                     <div class="card-actions">
-                        ${this.isLoggedIn ? `
-                        <button class="action-btn btn-edit" title="Modifier">
-                            <i class="fas fa-edit"></i>
-                            Modifier
-                        </button>
-                        <button class="action-btn btn-delete" title="Supprimer">
-                            <i class="fas fa-trash"></i>
-                            Supprimer
-                        </button>
-                        ` : ''}
+                        ${actionButtons}
                     </div>
                 </div>
             </div>
@@ -639,12 +463,12 @@ class AnimalApp {
     populateTagSelect() {
         const select = document.getElementById('tags-select');
         const display = document.getElementById('selected-tags-display');
-
+        
         if (!select) return;
-
+        
         // Vider le select
         select.innerHTML = '';
-
+        
         if (!this.availableTags || this.availableTags.length === 0) {
             select.innerHTML = '<option value="" disabled>Aucun tag disponible</option>';
             if (display) {
@@ -652,7 +476,7 @@ class AnimalApp {
             }
             return;
         }
-
+        
         // Option par défaut
         const defaultOption = document.createElement('option');
         defaultOption.value = "";
@@ -660,14 +484,14 @@ class AnimalApp {
         defaultOption.disabled = true;
         defaultOption.selected = true;
         select.appendChild(defaultOption);
-
+        
         // Trier les tags par nombre d'animaux (descendant)
         const sortedTags = [...this.availableTags].sort((a, b) => {
             const countA = this.animalTagsCount[a] || 0;
             const countB = this.animalTagsCount[b] || 0;
             return countB - countA;
         });
-
+        
         // Ajouter chaque tag
         sortedTags.forEach(tag => {
             const option = document.createElement('option');
@@ -676,7 +500,7 @@ class AnimalApp {
             option.dataset.count = this.animalTagsCount[tag] || 0;
             select.appendChild(option);
         });
-
+        
         // Mettre à jour l'affichage des tags sélectionnés
         this.updateSelectedTagsDisplay();
     }
@@ -686,7 +510,7 @@ class AnimalApp {
         const selectedOptions = Array.from(select.selectedOptions)
             .filter(opt => opt.value) // Exclure l'option par défaut
             .map(opt => opt.value);
-
+        
         this.selectedTagsFromSelect = selectedOptions;
         this.updateSelectedTagsDisplay();
         this.currentPage = 1;
@@ -696,20 +520,20 @@ class AnimalApp {
     updateSelectedTagsDisplay() {
         const display = document.getElementById('selected-tags-display');
         const countSpan = document.getElementById('selected-count');
-
+        
         if (!display || !countSpan) return;
-
+        
         // Mettre à jour le compteur
         countSpan.textContent = `${this.selectedTagsFromSelect.length} tag(s) sélectionné(s)`;
-
+        
         // Afficher les tags sélectionnés
         display.innerHTML = '';
-
+        
         if (this.selectedTagsFromSelect.length === 0) {
             display.innerHTML = '<div class="no-tags-message">Aucun tag sélectionné</div>';
             return;
         }
-
+        
         this.selectedTagsFromSelect.forEach(tag => {
             const tagElement = document.createElement('div');
             tagElement.className = 'selected-tag-item';
@@ -720,7 +544,7 @@ class AnimalApp {
                 </button>
             `;
             display.appendChild(tagElement);
-
+            
             // Ajouter l'événement pour supprimer le tag
             tagElement.querySelector('.remove-tag-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -734,14 +558,14 @@ class AnimalApp {
         if (index > -1) {
             this.selectedTagsFromSelect.splice(index, 1);
             this.updateSelectedTagsDisplay();
-
+            
             // Désélectionner dans le select
             const select = document.getElementById('tags-select');
             if (select) {
                 const option = Array.from(select.options).find(opt => opt.value === tag);
                 if (option) option.selected = false;
             }
-
+            
             this.currentPage = 1;
             this.displayAnimals();
         }
@@ -749,21 +573,21 @@ class AnimalApp {
 
     clearTagSelector() {
         this.selectedTagsFromSelect = [];
-
+        
         // Désélectionner toutes les options
         const select = document.getElementById('tags-select');
         if (select) {
             Array.from(select.options).forEach(option => {
                 option.selected = false;
             });
-
+            
             // Réactiver l'option par défaut
             const defaultOption = select.options[0];
             if (defaultOption) {
                 defaultOption.selected = true;
             }
         }
-
+        
         this.updateSelectedTagsDisplay();
         this.currentPage = 1;
         this.displayAnimals();
@@ -779,122 +603,169 @@ class AnimalApp {
     // ==================== MODAL ====================
 
     openModal(animal = null) {
+        this.editingAnimal = animal;
         const modal = document.getElementById('animal-modal');
+        const form = document.getElementById('animal-form');
         const title = document.getElementById('modal-title');
-        const saveBtn = document.getElementById('save-button-text');
 
         if (animal) {
-            title.innerHTML = `<i class="fas fa-edit"></i><span>Modifier ${animal.name}</span>`;
-            saveBtn.textContent = 'Mettre à jour';
-
-            document.getElementById('animal-id').value = animal.id;
-            document.getElementById('animal-name').value = animal.name;
-            document.getElementById('animal-type').value = animal.type;
+            title.textContent = 'Modifier l\'Animal';
+            document.getElementById('animal-name').value = animal.name || '';
+            document.getElementById('animal-type').value = animal.type || 'cats'; // Default to cats if type is missing
+            document.getElementById('animal-type').disabled = true; // Disable type change when editing
             document.getElementById('animal-tags').value = animal.tag || '';
             document.getElementById('animal-description').value = animal.description || '';
             document.getElementById('animal-image').value = animal.img || '';
-
-            this.editingAnimal = animal;
         } else {
-            title.innerHTML = `<i class="fas fa-plus-circle"></i><span>Ajouter un nouvel animal</span>`;
-            saveBtn.textContent = 'Enregistrer';
-
-            document.getElementById('animal-form').reset();
-            document.getElementById('animal-id').value = '';
-            this.editingAnimal = null;
+            title.textContent = 'Ajouter un Animal';
+            document.getElementById('animal-type').disabled = false;
+            form.reset();
         }
 
         this.updateImagePreview(document.getElementById('animal-image').value);
-        modal.style.display = 'flex';
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+
+    openAdoptModal(animal) {
+        // Submit adoption request directly
+        this.submitAdoptionRequest(animal);
+    }
+
+    async submitAdoptionRequest(animal) {
+        if (!this.isLoggedIn) {
+            this.showNotification('Veuillez vous connecter pour adopter un animal.', 'warning');
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 2000);
+            return;
+        }
+
+        const confirmation = confirm(`Voulez-vous vraiment envoyer une demande d'adoption pour ${animal.name} ?`);
+        if (!confirmation) return;
+
+        try {
+            const formData = {
+                animalId: animal.id,
+                animalType: animal.type,
+                adopterName: this.userName || 'Adopter',
+                adopterEmail: this.userEmail,
+                adopterPhone: '',
+                message: `Demande d'adoption pour ${animal.name} (${animal.type} #${animal.id})`
+            };
+
+            const response = await fetch('/api/adopt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                this.showNotification('Demande d\'adoption envoyée avec succès !', 'success');
+                // Optionally redirect to adopt page to see the request
+                setTimeout(() => {
+                    window.location.href = 'adopt.html';
+                }, 1500);
+            } else {
+                throw new Error(data.error || 'Erreur lors de l\'envoi.');
+            }
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+        }
     }
 
     updateImagePreview(url) {
         const preview = document.getElementById('image-preview');
-
-        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-            preview.innerHTML = `
-                <img src="${url}" 
-                     alt="Aperçu" 
-                     style="max-width: 100%; max-height: 200px; border-radius: 8px;"
-                     onerror="this.parentElement.innerHTML='<div class=\\'preview-placeholder\\'><i class=\\'fas fa-exclamation-triangle\\'></i><span>Image non disponible</span></div>'">
-            `;
+        if (url && url.trim()) {
+            preview.innerHTML = `<img src="${url}" alt="Aperçu" onerror="this.parentElement.innerHTML='<div class=\\'preview-placeholder\\'><i class=\\'fas fa-image\\'></i><p>Erreur de chargement</p></div>'">`;
         } else {
-            preview.innerHTML = `
-                <div class="preview-placeholder">
-                    <i class="fas fa-image"></i>
-                    <span>Aperçu de l'image</span>
-                </div>
-            `;
+            preview.innerHTML = `<div class="preview-placeholder"><i class="fas fa-image"></i><p>Aperçu de l'image</p></div>`;
         }
     }
 
     closeModal() {
-        document.getElementById('animal-modal').style.display = 'none';
+        const modal = document.getElementById('animal-modal');
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
         this.editingAnimal = null;
     }
 
     async saveAnimal() {
         const form = document.getElementById('animal-form');
         const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
 
-        const animalData = {
-            name: formData.get('name').trim(),
-            tag: formData.get('tags').trim(),
-            description: formData.get('description').trim(),
-            img: formData.get('image').trim()
-        };
+        // For editing, ensure type is set from the editing animal
+        if (this.editingAnimal) {
+            data.type = this.editingAnimal.type;
+        }
 
-        // Validation
-        if (!animalData.name) {
-            this.showNotification('Le nom est obligatoire', 'error');
+        // Validate required fields
+        if (!data.name || !data.type) {
+            this.showNotification('Nom et type sont requis', 'error');
             return;
         }
 
-        const type = formData.get('type');
-        if (!type) {
-            this.showNotification('Le type est obligatoire', 'error');
-            return;
-        }
-
-        const id = formData.get('id');
-        const saveBtn = document.getElementById('save-animal');
-        const loadingSpinner = document.getElementById('save-loading');
-
-        saveBtn.disabled = true;
-        loadingSpinner.style.display = 'block';
-
+        this.showLoading();
         try {
-            const url = id ? `${this.apiBaseUrl}/${type}/${id}` : `${this.apiBaseUrl}/${type}`;
-            const method = id ? 'PUT' : 'POST';
+            const url = this.editingAnimal 
+                ? `${this.apiBaseUrl}/${this.editingAnimal.type}/${this.editingAnimal.id}`
+                : `${this.apiBaseUrl}/${data.type}`;
+            const method = this.editingAnimal ? 'PUT' : 'POST';
 
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(animalData)
+                body: JSON.stringify(data)
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.success) {
+            if (result.success) {
                 this.showNotification(
-                    id ? 'Animal mis à jour avec succès' : 'Animal ajouté avec succès',
+                    this.editingAnimal ? 'Animal modifié avec succès' : 'Animal ajouté avec succès',
                     'success'
                 );
+                this.closeModal();
                 await this.loadAnimals();
                 await this.updateStats();
-                this.closeModal();
+                await this.loadTagsForSelect();
             } else {
-                throw new Error(data.error);
+                throw new Error(result.error || 'Erreur lors de la sauvegarde');
             }
         } catch (error) {
+            console.error('Save animal error:', error);
             this.showNotification(error.message || 'Erreur lors de la sauvegarde', 'error');
         } finally {
-            saveBtn.disabled = false;
-            loadingSpinner.style.display = 'none';
+            this.hideLoading();
         }
     }
 
+    // Helper function to find animal by ID and type
+    findAnimalById(id, type) {
+        return this.animals.find(animal => animal.id == id && animal.type === type);
+    }
+
     async deleteAnimal(type, id) {
+        // Validate inputs
+        if (!type || !['cats', 'dogs', 'mouses'].includes(type)) {
+            this.showNotification('Type d\'animal invalide', 'error');
+            return;
+        }
+        
+        if (!id || isNaN(id) || id <= 0) {
+            this.showNotification('ID d\'animal invalide', 'error');
+            return;
+        }
+
+        // Show confirmation dialog
+        const animal = this.findAnimalById(id, type);
+        const animalName = animal ? animal.name : `ID ${id}`;
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer "${animalName}" ? Cette action est irréversible.`)) {
+            return;
+        }
+
         this.showLoading();
         try {
             const response = await fetch(`${this.apiBaseUrl}/${type}/${id}`, {
@@ -907,11 +778,13 @@ class AnimalApp {
                 this.showNotification('Animal supprimé avec succès', 'success');
                 await this.loadAnimals();
                 await this.updateStats();
+                await this.loadTagsForSelect();
             } else {
-                throw new Error(data.error);
+                throw new Error(data.error || 'Erreur inconnue lors de la suppression');
             }
         } catch (error) {
-            this.showNotification(error.message || 'Erreur lors de la suppression', 'error');
+            console.error('Delete animal error:', error);
+            this.showNotification(error.message || 'Erreur lors de la suppression. Veuillez vérifier votre connexion.', 'error');
         } finally {
             this.hideLoading();
         }
@@ -967,29 +840,32 @@ class AnimalApp {
     async checkLoginStatus() {
         try {
             const response = await fetch('/api/me');
+            if (!response.ok) {
+                console.warn('Auth check failed: HTTP', response.status);
+                this.isLoggedIn = false;
+                this.updateAuthUI();
+                return;
+            }
             const data = await response.json();
             this.isLoggedIn = data.loggedIn;
-            this.userEmail = data.email || '';
+            if (data.loggedIn) {
+                this.userEmail = data.email;
+                this.userName = data.name;
+            }
             this.updateAuthUI();
         } catch (error) {
             console.error('Error checking login status:', error);
+            this.isLoggedIn = false;
+            this.updateAuthUI();
         }
     }
 
     updateAuthUI() {
-        const authBtn = document.getElementById('auth-btn');
-        const userInfo = document.getElementById('user-info');
-        const userEmailDisplay = document.getElementById('user-email-display');
-
+        const logoutBtn = document.getElementById('logout-btn');
         if (this.isLoggedIn) {
-            authBtn.classList.add('hidden');
-            userInfo.classList.remove('hidden');
-            if (userEmailDisplay && this.userEmail) {
-                userEmailDisplay.textContent = this.userEmail;
-            }
+            logoutBtn.classList.remove('hidden');
         } else {
-            authBtn.classList.remove('hidden');
-            userInfo.classList.add('hidden');
+            logoutBtn.classList.add('hidden');
         }
         // Re-render cards to show/hide buttons
         this.displayAnimals();
@@ -998,11 +874,11 @@ class AnimalApp {
     setActiveNavLink() {
         const currentPath = window.location.pathname;
         const navLinks = document.querySelectorAll('.nav-link');
-
+        
         navLinks.forEach(link => {
             link.classList.remove('active');
         });
-
+        
         if (currentPath === '/' || currentPath.includes('index.html')) {
             document.querySelector('a[href="index.html"]').classList.add('active');
         } else if (currentPath.includes('about.html')) {
@@ -1012,58 +888,14 @@ class AnimalApp {
         }
     }
 
-    openAuthModal() {
-        document.getElementById('auth-modal').style.display = 'flex';
-        setTimeout(() => {
-            document.getElementById('auth-email').focus();
-        }, 100);
-    }
-
-    closeAuthModal() {
-        document.getElementById('auth-modal').style.display = 'none';
-        document.getElementById('auth-form').reset();
-    }
-
-    async handleAuth(e) {
-        e.preventDefault();
-        const email = document.getElementById('auth-email').value.trim();
-
-        if (!email) {
-            this.showNotification('Please enter an email', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                this.isLoggedIn = true;
-                this.userEmail = email;
-                this.updateAuthUI();
-                this.closeAuthModal();
-                this.showNotification(`Welcome, ${email}! 🎉`, 'success');
-            } else {
-                this.showNotification(data.error || 'Authentication failed', 'error');
-            }
-        } catch (error) {
-            console.error('Auth error:', error);
-            this.showNotification('Network error. Please try again.', 'error');
-        }
-    }
+    // Login and signup modals removed as authentication is handled by login.html
 
     async logout() {
         try {
-            await fetch('/api/logout', { method: 'POST' });
+            await fetch('/api/auth/logout', { method: 'POST' });
             this.isLoggedIn = false;
-            this.userEmail = '';
             this.updateAuthUI();
-            this.showNotification('Logged out successfully', 'info');
+            this.showNotification('Déconnexion réussie', 'info');
         } catch (error) {
             console.error('Logout error:', error);
         }
@@ -1073,22 +905,4 @@ class AnimalApp {
 // Initialize app when page loads
 document.addEventListener('DOMContentLoaded', () => {
     window.animalApp = new AnimalApp();
-    // Mobile Menu Toggle
-    const menuToggle = document.getElementById('menu-toggle');
-    const navMenu = document.getElementById('nav-menu');
-
-    if (menuToggle && navMenu) {
-        menuToggle.addEventListener('click', () => {
-            menuToggle.classList.toggle('active');
-            navMenu.classList.toggle('active');
-        });
-
-        // Close menu when clicking a link
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', () => {
-                menuToggle.classList.remove('active');
-                navMenu.classList.remove('active');
-            });
-        });
-    }
 });

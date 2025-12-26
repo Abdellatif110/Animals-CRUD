@@ -32,3 +32,24 @@ CREATE TABLE IF NOT EXISTS users (
   password TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Create 'sessions' table for express-mysql-session
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+  expires INT(11) UNSIGNED NOT NULL,
+  data MEDIUMTEXT COLLATE utf8mb4_bin,
+  PRIMARY KEY (session_id)
+);
+
+-- Create 'adoption_requests' table
+CREATE TABLE IF NOT EXISTS adoption_requests (
+  id INTEGER PRIMARY KEY AUTO_INCREMENT,
+  animal_id INTEGER NOT NULL,
+  animal_type TEXT NOT NULL,
+  user_email TEXT NOT NULL,
+  adopter_name TEXT NOT NULL,
+  adopter_phone TEXT,
+  message TEXT,
+  status TEXT DEFAULT 'pending',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

@@ -136,6 +136,26 @@ export default {
 					return new Response(JSON.stringify({ success: true, count: allAnimals.length, data: allAnimals }), { headers });
 				}
 
+				// ADOPT Route
+				if (path === '/api/adopt' && method === 'POST') {
+					try {
+						const body = await request.json();
+						const { animalId, animalType, adopterName, adopterEmail, adopterPhone, message } = body;
+
+						if (!animalId || !animalType || !adopterName || !adopterEmail) {
+							return new Response(JSON.stringify({ success: false, error: 'Missing required fields' }), { headers, status: 400 });
+						}
+
+						await env.DB.prepare('INSERT INTO adoption_requests (animal_id, animal_type, adopter_name, user_email, adopter_phone, message) VALUES (?, ?, ?, ?, ?, ?)')
+							.bind(animalId, animalType, adopterName, adopterEmail, adopterPhone || '', message || '')
+							.run();
+
+						return new Response(JSON.stringify({ success: true, message: 'Adoption request submitted successfully' }), { headers, status: 201 });
+					} catch (e) {
+						return new Response(JSON.stringify({ success: false, error: e.message }), { headers, status: 500 });
+					}
+				}
+
 				// Stats Route
 				if (path === '/api/stats' && method === 'GET') {
 					const stats = await env.DB.prepare(`
@@ -192,7 +212,12 @@ export default {
 						const hashedPassword = await hashPassword(password);
 						await env.DB.prepare('INSERT INTO users (email, password) VALUES (?, ?)').bind(email, hashedPassword).run();
 
-						return new Response(JSON.stringify({ success: true, message: 'User created' }), { headers });
+						// Auto-Login: Set Cookie
+						const cookie = `auth_token=${btoa(email)}; Path=/; SameSite=Lax; Max-Age=86400`;
+
+						return new Response(JSON.stringify({ success: true, message: 'User created' }), {
+							headers: { ...headers, 'Set-Cookie': cookie }
+						});
 					} catch (e) {
 						return new Response(JSON.stringify({ success: false, error: e.message }), { headers });
 					}
@@ -211,8 +236,6 @@ export default {
 						}
 
 						// Create a simple session cookie (in a real app Use JWT)
-						// For this demo we will set a cookie with the user ID/email signed or just the email for simplicity as requested "stock info"
-						// WARNING: In production use secure, httpOnly, signed cookies or JWT.
 						const cookie = `auth_token=${btoa(user.email)}; Path=/; SameSite=Lax; Max-Age=86400`;
 
 						return new Response(JSON.stringify({ success: true, message: 'Logged in', email: user.email }), {
@@ -254,8 +277,22 @@ export default {
 			}
 		}
 
-		// Static Assets handled by ASSETS binding
+		// Static Assets handled by ASSETS binding, with Protection
 		if (env.ASSETS) {
+			// Protect Root/Index
+			const url = new URL(request.url);
+			if (url.pathname === '/' || url.pathname === '/index.html') {
+				const cookie = request.headers.get('Cookie');
+				let loggedIn = false;
+				if (cookie && cookie.includes('auth_token=')) {
+					loggedIn = true;
+				}
+
+				if (!loggedIn) {
+					return Response.redirect(url.origin + '/login.html', 302);
+				}
+			}
+
 			return env.ASSETS.fetch(request);
 		}
 

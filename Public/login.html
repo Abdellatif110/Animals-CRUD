@@ -1,64 +1,65 @@
 <!DOCTYPE html>
-<html lang="fr">
-
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Animals CRUD</title>
-    <link rel="stylesheet" href="style.css?v=3">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
         body {
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: linear-gradient(135deg, var(--bg-dark), var(--bg-card));
+            background: linear-gradient(135deg, #0f172a, #1e293b);
             margin: 0;
             padding: 20px;
+            color: #fff;
         }
 
-        /* Auth Card specific overrides */
         .auth-container {
             width: 100%;
-            max-width: 450px;
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            animation: slideUp 0.5s ease-out;
+            max-width: 400px;
+            background: rgba(30, 41, 59, 0.9);
+            border-radius: 10px;
+            padding: 2.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         }
 
         .auth-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 2rem;
         }
 
         .auth-logo {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #4361ee, #7209b7);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 20px;
-            font-size: 2.5rem;
+            margin: 0 auto 1.5rem;
+            font-size: 2rem;
             color: white;
-            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
         }
 
         .auth-title {
             font-size: 2rem;
             font-weight: 700;
-            color: var(--text-primary);
+            color: #f1f5f9;
             margin-bottom: 10px;
         }
 
         .auth-subtitle {
-            color: var(--text-secondary);
+            color: #94a3b8;
             font-size: 1rem;
         }
 
@@ -70,7 +71,7 @@
         .auth-form label {
             display: block;
             margin-bottom: 8px;
-            color: var(--text-secondary);
+            color: #94a3b8;
             font-weight: 500;
         }
 
@@ -80,21 +81,21 @@
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            color: var(--text-primary);
+            color: #f1f5f9;
             font-size: 1rem;
             transition: all 0.3s ease;
         }
 
         .auth-form input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+            border-color: #4361ee;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
             outline: none;
         }
 
         .btn-auth {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: linear-gradient(135deg, #4361ee, #7209b7);
             color: white;
             border: none;
             border-radius: 12px;
@@ -111,7 +112,7 @@
 
         .btn-auth:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 10px 20px rgba(67, 97, 238, 0.3);
         }
 
         .auth-footer {
@@ -124,7 +125,7 @@
         .switch-auth-btn {
             background: none;
             border: none;
-            color: var(--primary);
+            color: #4361ee;
             font-weight: 600;
             cursor: pointer;
             font-size: 0.95rem;
@@ -132,7 +133,7 @@
         }
 
         .switch-auth-btn:hover {
-            color: var(--secondary);
+            color: #7209b7;
             text-decoration: underline;
         }
 
@@ -218,6 +219,7 @@
         <span id="toast-message"></span>
     </div>
 
+    <script src="common.js"></script>
     <script>
         const form = document.getElementById('auth-form');
         const toggleBtn = document.getElementById('toggle-auth');
@@ -257,46 +259,70 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
-            const endpoint = isSignup ? '/api/auth/signup' : '/api/auth/login';
+            
+            if (!email || !password) {
+                showToast('Please fill in all fields', 'error');
+                return;
+            }
+
+            const submitBtn = document.querySelector('#submit-btn');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
             try {
-                const button = document.querySelector('.btn-auth');
-                const originalText = button.innerHTML;
-                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-                button.disabled = true;
-
+                const endpoint = isSignup ? '/api/auth/signup' : '/api/auth/login';
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include'
                 });
 
                 const data = await response.json();
 
-                if (data.success) {
-                    showToast('Authentication successful! Redirecting...', 'success');
-                    setTimeout(() => window.location.href = '/', 1000);
-                } else {
-                    showToast(data.error || 'Authentication failed', 'error');
+                if (!response.ok) {
+                    throw new Error(data.error || 'Something went wrong');
                 }
+
+                showToast(data.message || 'Success!', 'success');
+                
+                // Redirect to index after successful login/signup
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+
             } catch (error) {
-                showToast('Connection error. Please try again.', 'error');
+                console.error('Auth error:', error);
+                showToast(error.message || 'An error occurred', 'error');
             } finally {
-                const button = document.querySelector('.btn-auth');
-                button.innerHTML = isSignup ? '<span>Sign Up</span><i class="fas fa-arrow-right"></i>' : '<span>Sign In</span><i class="fas fa-arrow-right"></i>';
-                button.disabled = false;
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
             }
         });
 
         // Check if already logged in
-        fetch('/api/me').then(res => res.json()).then(data => {
-            if (data.loggedIn) {
+        fetch('/api/me').then(res => {
+            if (!res.ok) {
+                console.warn('Auth check failed: HTTP', res.status);
+                return;
+            }
+            return res.json();
+        }).then(data => {
+            if (data && data.loggedIn) {
                 window.location.href = '/';
             }
         });
     </script>
+    <script>
+        // Show the page only after all resources are loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.style.opacity = 1;
+        });
+    </script>
 </body>
-
 </html>
