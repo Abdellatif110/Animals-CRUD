@@ -1,0 +1,12 @@
+name = "animals-crud"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "./Public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "testdb"
+database_id = "cf6dd7c2-0e4f-4fc9-a895-92d6bf9159fa"
