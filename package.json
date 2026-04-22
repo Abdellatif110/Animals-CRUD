@@ -24,6 +24,7 @@
     "mysql": "^2.18.1",
     "mysql2": "^3.16.0",
     "scoop": "^0.0.2",
+    "sqlite3": "^6.0.1",
     "validator": "^13.15.26"
   },
   "devDependencies": {

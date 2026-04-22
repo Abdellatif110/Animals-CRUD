@@ -12,17 +12,7 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ========== DATABASE CONNECTION ==========
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USERNAME || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DATABASE || 'testdb',
-    port: process.env.DB_PORT || 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+const pool = require('./sqlite-adapter');
 
 // Test connection
 pool.getConnection((err, connection) => {
@@ -30,7 +20,7 @@ pool.getConnection((err, connection) => {
         console.error('❌ Database connection error:', err.message);
         return;
     }
-    console.log('✅ Connected to MySQL database: testdb');
+    console.log('✅ Connected to SQLite database');
     connection.release();
 });
 
@@ -42,23 +32,9 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Session configuration
-const sessionStore = new MySQLStore({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USERNAME || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DATABASE || 'testdb',
-    port: process.env.DB_PORT || 3306,
-    createDatabaseTable: true,
-    schema: {
-        tableName: 'sessions'
-    }
-}, pool);
-
-// Session middleware
+// Session middleware using memory store
 app.use(session({
     secret: 'your-secret-key-here',
-    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -106,7 +82,7 @@ const requireAuth = (req, res, next) => {
     }
     
     // Only redirect if not already on login page or API auth endpoints
-    if (req.path === '/login.html' || req.path.startsWith('/api/auth/') || req.path === '/api/me') {
+    if (req.path === '/login.html' || req.path.startsWith('/api/auth/') || req.path === '/api/me' || req.path === '/api/signup' || req.path === '/api/login') {
         return next();
     }
     
@@ -123,6 +99,8 @@ app.use((req, res, next) => {
     else if (req.path.startsWith('/api/') && 
              !req.path.startsWith('/api/auth/') && 
              req.path !== '/api/me' &&
+             req.path !== '/api/signup' &&
+             req.path !== '/api/login' &&
              req.path !== '/api/animals/all' &&
              req.path !== '/api/stats' &&
              req.path !== '/api/tags' &&
@@ -387,10 +365,9 @@ app.get('/api/health', async (req, res) => {
     try {
         const connection = await pool.promise().getConnection();
         try {
-            const [tables] = await connection.promise().query('SHOW TABLES');
-            connection.release();
+            const [tables] = await pool.promise().query("SELECT name FROM sqlite_master WHERE type='table'");
             
-            const tableNames = tables.map(table => Object.values(table)[0]);
+            const tableNames = tables.map(table => table.name);
             
             res.json({
                 status: 'OK',
@@ -500,6 +477,152 @@ app.get('/api/tags', async (req, res) => {
             success: false,
             error: 'Failed to get tags: ' + error.message
         });
+    }
+});
+
+
+
+// Setup database tables
+app.get('/api/setup', async (req, res) => {
+    try {
+        const createCatsTable = `
+            CREATE TABLE IF NOT EXISTS cats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(100) NOT NULL,
+                tag VARCHAR(255),
+                description TEXT,
+                img VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        const createDogsTable = `
+            CREATE TABLE IF NOT EXISTS dogs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(100) NOT NULL,
+                tag VARCHAR(255),
+                description TEXT,
+                img VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        const createMousesTable = `
+            CREATE TABLE IF NOT EXISTS mouses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(100) NOT NULL,
+                tag VARCHAR(255),
+                description TEXT,
+                img VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        const createUsersTable = `
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        const createAdoptionRequestsTable = `
+            CREATE TABLE IF NOT EXISTS adoption_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                animal_id INTEGER NOT NULL,
+                animal_type VARCHAR(50) NOT NULL,
+                adopter_name VARCHAR(100) NOT NULL,
+                user_email VARCHAR(255) NOT NULL,
+                adopter_phone VARCHAR(20),
+                message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+
+        await Promise.all([
+            pool.promise().query(createCatsTable),
+            pool.promise().query(createDogsTable),
+            pool.promise().query(createMousesTable),
+            pool.promise().query(createUsersTable),
+            pool.promise().query(createAdoptionRequestsTable)
+        ]);
+
+        res.json({
+            success: true,
+            message: 'Tables created successfully',
+            tables: ['cats', 'dogs', 'mouses', 'users', 'adoption_requests']
+        });
+    } catch (error) {
+        console.error('Error setting up database:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to create tables: ' + error.message 
+        });
+    }
+});
+
+// Load demo data
+app.get('/api/demo', async (req, res) => {
+    try {
+        const demoData = {
+            dogs: [
+                [22, 'Buddy', 'fidèle, amical', 'Un chien fidèle et très amical avec tout le monde', 'https://images.unsplash.com/photo-1552053831-71594a27632d'],
+                [23, 'Rocky', 'protecteur, fort', 'Un chien fort et protecteur de sa famille', 'https://images.unsplash.com/photo-1568572931-71594a27632d'],
+                [24, 'Luna', 'intelligente, douce', 'Une chienne intelligente et très douce avec les enfants', 'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8'],
+                [25, 'Dogi', 'DOG234', 'jda, yma, 7na', 'https://img.freepik.com/photos-gratuite/adorable-chien-basenji-brun-blanc-souriant-donnant-cinq-haut_181624-43666.jpg']
+            ],
+            mouses: [
+                [31, 'Squeaky', 'curieux, rapide', 'Une souris très curieuse qui explore partout', 'https://img.freepik.com/photos-gratuite/vue-du-persil-mangeant-souris_23-2150702661.jpg'],
+                [32, 'Nibbles', null, 'Une souris calme qui aime grignoter', 'https://img.freepik.com/photos-premium/aigle-dessin-anime-phare-maison_962751-872.jpg'],
+                [33, 'Zippy', null, 'Une souris pleine d\'énergie qui adore courir dans la roue', 'https://img.freepik.com/photos-gratuite/vue-du-persil-mangeant-souris_23-2150702661.jpg'],
+                [34, 'sour', null, 'hado , djh, sjdj', 'https://img.freepik.com/vecteurs-libre/mignonne-petite-souris-tenant-illustration-icone-vecteur-dessin-anime-fromage-concept-icone-nourriture-animale-isole-vecteur-premium-style-dessin-anime-plat_138676-4144.jpg']
+            ],
+            cats: [
+                [27, 'Whiskers', 'calme, affectueux', 'Un chat calme et affectueux qui aime les câlins', 'https://img.freepik.com/photos-gratuite/chat-scottish-fold-gris-isole-blanc_53876-136340.jpg'],
+                [29, 'Simba', 'royal, protecteur', 'Un chat majestueux qui surveille son territoire', 'https://images.unsplash.com/photo-1543852786-1cf6624b9987'],
+                [30, 'citty', 'CTE124', 'beauty, belle_jully', 'https://img.freepik.com/photos-gratuite/kitty-muri-devant-fond-blanc_23-2147843818.jpg'],
+                [31, 'CYTY', 'CT999', 'HAbby, hay, jau', 'https://img.freepik.com/photos-gratuite/mignon-chat-domestique-assis-dans-panier-osier-regardant-camera-generee-par-ai_188544-15494.jpg']
+            ]
+        };
+
+        // Clear tables
+        await Promise.all([
+            pool.promise().query('DELETE FROM cats'),
+            pool.promise().query('DELETE FROM dogs'),
+            pool.promise().query('DELETE FROM mouses')
+        ]);
+
+        // Insert data
+        const insertPromises = [];
+        
+        const insert = (table, data) => {
+            const sql = `INSERT INTO ${table} (id, name, tag, description, img) VALUES (?, ?, ?, ?, ?)`;
+            return pool.promise().query(sql, data).catch(err => {
+                // Try without ID if duplicate
+                const fallbackSql = `INSERT INTO ${table} (name, tag, description, img) VALUES (?, ?, ?, ?)`;
+                return pool.promise().query(fallbackSql, [data[1], data[2], data[3], data[4]]);
+            });
+        };
+
+        demoData.cats.forEach(item => insertPromises.push(insert('cats', item)));
+        demoData.dogs.forEach(item => insertPromises.push(insert('dogs', item)));
+        demoData.mouses.forEach(item => insertPromises.push(insert('mouses', item)));
+
+        await Promise.all(insertPromises);
+
+        res.json({
+            success: true,
+            message: 'Data loaded successfully',
+            counts: {
+                cats: demoData.cats.length,
+                dogs: demoData.dogs.length,
+                mouses: demoData.mouses.length
+            }
+        });
+    } catch (error) {
+        console.error('Error loading demo data:', error);
+        res.status(500).json({ success: false, error: 'Failed to load demo data: ' + error.message });
     }
 });
 
@@ -619,150 +742,6 @@ app.delete('/api/:type/:id', (req, res) => {
             res.json({ success: true, message: 'Deleted successfully' });
         });
     });
-});
-
-// Setup database tables
-app.get('/api/setup', async (req, res) => {
-    try {
-        const createCatsTable = `
-            CREATE TABLE IF NOT EXISTS cats (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                name VARCHAR(100) NOT NULL,
-                tag VARCHAR(255),
-                description TEXT,
-                img VARCHAR(500),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        const createDogsTable = `
-            CREATE TABLE IF NOT EXISTS dogs (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                name VARCHAR(100) NOT NULL,
-                tag VARCHAR(255),
-                description TEXT,
-                img VARCHAR(500),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        const createMousesTable = `
-            CREATE TABLE IF NOT EXISTS mouses (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                name VARCHAR(100) NOT NULL,
-                tag VARCHAR(255),
-                description TEXT,
-                img VARCHAR(500),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        const createUsersTable = `
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        const createAdoptionRequestsTable = `
-            CREATE TABLE IF NOT EXISTS adoption_requests (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                animal_id INT NOT NULL,
-                animal_type VARCHAR(50) NOT NULL,
-                adopter_name VARCHAR(100) NOT NULL,
-                user_email VARCHAR(255) NOT NULL,
-                adopter_phone VARCHAR(20),
-                message TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `;
-
-        await Promise.all([
-            pool.promise().query(createCatsTable),
-            pool.promise().query(createDogsTable),
-            pool.promise().query(createMousesTable),
-            pool.promise().query(createUsersTable),
-            pool.promise().query(createAdoptionRequestsTable)
-        ]);
-
-        res.json({
-            success: true,
-            message: 'Tables created successfully',
-            tables: ['cats', 'dogs', 'mouses', 'users', 'adoption_requests']
-        });
-    } catch (error) {
-        console.error('Error setting up database:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Failed to create tables: ' + error.message 
-        });
-    }
-});
-
-// Load demo data
-app.get('/api/demo', async (req, res) => {
-    try {
-        const demoData = {
-            dogs: [
-                [22, 'Buddy', 'fidèle, amical', 'Un chien fidèle et très amical avec tout le monde', 'https://images.unsplash.com/photo-1552053831-71594a27632d'],
-                [23, 'Rocky', 'protecteur, fort', 'Un chien fort et protecteur de sa famille', 'https://images.unsplash.com/photo-1568572931-71594a27632d'],
-                [24, 'Luna', 'intelligente, douce', 'Une chienne intelligente et très douce avec les enfants', 'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8'],
-                [25, 'Dogi', 'DOG234', 'jda, yma, 7na', 'https://img.freepik.com/photos-gratuite/adorable-chien-basenji-brun-blanc-souriant-donnant-cinq-haut_181624-43666.jpg']
-            ],
-            mouses: [
-                [31, 'Squeaky', 'curieux, rapide', 'Une souris très curieuse qui explore partout', 'https://img.freepik.com/photos-gratuite/vue-du-persil-mangeant-souris_23-2150702661.jpg'],
-                [32, 'Nibbles', null, 'Une souris calme qui aime grignoter', 'https://img.freepik.com/photos-premium/aigle-dessin-anime-phare-maison_962751-872.jpg'],
-                [33, 'Zippy', null, 'Une souris pleine d\'énergie qui adore courir dans la roue', 'https://img.freepik.com/photos-gratuite/vue-du-persil-mangeant-souris_23-2150702661.jpg'],
-                [34, 'sour', null, 'hado , djh, sjdj', 'https://img.freepik.com/vecteurs-libre/mignonne-petite-souris-tenant-illustration-icone-vecteur-dessin-anime-fromage-concept-icone-nourriture-animale-isole-vecteur-premium-style-dessin-anime-plat_138676-4144.jpg']
-            ],
-            cats: [
-                [27, 'Whiskers', 'calme, affectueux', 'Un chat calme et affectueux qui aime les câlins', 'https://img.freepik.com/photos-gratuite/chat-scottish-fold-gris-isole-blanc_53876-136340.jpg'],
-                [29, 'Simba', 'royal, protecteur', 'Un chat majestueux qui surveille son territoire', 'https://images.unsplash.com/photo-1543852786-1cf6624b9987'],
-                [30, 'citty', 'CTE124', 'beauty, belle_jully', 'https://img.freepik.com/photos-gratuite/kitty-muri-devant-fond-blanc_23-2147843818.jpg'],
-                [31, 'CYTY', 'CT999', 'HAbby, hay, jau', 'https://img.freepik.com/photos-gratuite/mignon-chat-domestique-assis-dans-panier-osier-regardant-camera-generee-par-ai_188544-15494.jpg']
-            ]
-        };
-
-        // Clear tables
-        await Promise.all([
-            pool.promise().query('DELETE FROM cats'),
-            pool.promise().query('DELETE FROM dogs'),
-            pool.promise().query('DELETE FROM mouses')
-        ]);
-
-        // Insert data
-        const insertPromises = [];
-        
-        const insert = (table, data) => {
-            const sql = `INSERT INTO ${table} (id, name, tag, description, img) VALUES (?, ?, ?, ?, ?)`;
-            return pool.promise().query(sql, data).catch(err => {
-                // Try without ID if duplicate
-                const fallbackSql = `INSERT INTO ${table} (name, tag, description, img) VALUES (?, ?, ?, ?)`;
-                return pool.promise().query(fallbackSql, [data[1], data[2], data[3], data[4]]);
-            });
-        };
-
-        demoData.cats.forEach(item => insertPromises.push(insert('cats', item)));
-        demoData.dogs.forEach(item => insertPromises.push(insert('dogs', item)));
-        demoData.mouses.forEach(item => insertPromises.push(insert('mouses', item)));
-
-        await Promise.all(insertPromises);
-
-        res.json({
-            success: true,
-            message: 'Data loaded successfully',
-            counts: {
-                cats: demoData.cats.length,
-                dogs: demoData.dogs.length,
-                mouses: demoData.mouses.length
-            }
-        });
-    } catch (error) {
-        console.error('Error loading demo data:', error);
-        res.status(500).json({ success: false, error: 'Failed to load demo data: ' + error.message });
-    }
 });
 
 // ========== ERROR HANDLING ==========

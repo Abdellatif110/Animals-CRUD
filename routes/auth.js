@@ -36,9 +36,10 @@ module.exports = function (app, pool) {
             if (connection) connection.release();
             res.status(500).json({ success: false, error: 'Server error' });
         }
-    } catch (e) {
-        res.status(500).json({ success: false, error: 'Database connection error' });
-    }
+        } catch (e) {
+            console.error('Signup DB Connection Error:', e);
+            res.status(500).json({ success: false, error: 'Database connection error' });
+        }
 });
 
     app.post('/api/auth/login', async (req, res) => {
@@ -79,6 +80,7 @@ module.exports = function (app, pool) {
                 res.status(500).json({ success: false, error: 'Server error' });
             }
         } catch (e) {
+            console.error('Login DB Connection Error:', e);
             res.status(500).json({ success: false, error: 'Database connection error' });
         }
     });
